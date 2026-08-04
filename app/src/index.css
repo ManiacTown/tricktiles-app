@@ -1,17 +1,16 @@
 :root {
-  --felt: #24402f;
-  --felt-deep: #16261b;
-  --tile: #f1e8d6;
-  --tile-edge: #c9b896;
-  --tile-shadow: #8a7a5c;
-  --wood: #6b4429;
-  --wood-dark: #4a2e1b;
-  --ink: #241c14;
-  --amber: #d9a441;
-  --amber-bright: #f0be5e;
-  --invalid: #c1503f;
-  --incomplete: #8a8060;
-  --paper: #efe7d6;
+  --bg: #f5f4f0;
+  --surface: #ffffff;
+  --board-bg: #ebe9e3;
+  --rack-bg: #e7e4dc;
+  --border: #ddd9d0;
+  --ink: #2a2a26;
+  --ink-soft: #7a776c;
+  --accent: #6e9080;
+  --accent-soft: rgba(110, 144, 128, 0.14);
+  --invalid: #c77b67;
+  --invalid-soft: rgba(199, 123, 103, 0.14);
+  --incomplete: #b6b2a6;
 }
 
 * {
@@ -20,9 +19,9 @@
 
 body {
   margin: 0;
-  background: radial-gradient(ellipse at top, #2c4c37 0%, var(--felt-deep) 100%);
-  font-family: 'Inter', sans-serif;
-  color: var(--paper);
+  background: var(--bg);
+  font-family: 'Manrope', sans-serif;
+  color: var(--ink);
   min-height: 100vh;
 }
 
@@ -31,9 +30,5 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 24px 12px 40px;
-}
-
-.stamp {
-  font-family: 'Special Elite', monospace;
+  padding: 32px 16px 48px;
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../supabase/useAuth';
 import { getTodayPuzzle, getOrCreateSession, completeRound } from '../supabase/api';
+import { ROUNDS } from '../game/rounds';
 import type { DailyPuzzleRow, GameSessionRow } from '../supabase/types';
 import { SignIn } from './SignIn';
 import { GameScreen } from './GameScreen';
@@ -57,6 +58,16 @@ export function DailyChallenge() {
         completeRound(gameSession.id, round).catch((err) => {
           console.error('Failed to record round completion:', err);
         });
+      }}
+      adminSolution={puzzle.final_board}
+      onAdminComplete={async () => {
+        for (let round = 1; round <= ROUNDS; round++) {
+          try {
+            await completeRound(gameSession.id, round);
+          } catch (err) {
+            console.error(`Admin complete: failed to record round ${round}:`, err);
+          }
+        }
       }}
     />
   );

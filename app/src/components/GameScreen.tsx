@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -14,10 +14,11 @@ import { Hud } from './Hud';
 import { Controls } from './Controls';
 import { Overlay } from './Overlay';
 import { createInitialState, gameReducer } from '../game/gameState';
-import { isValidWord } from '../game/dictionary';
 import { LETTER_VALUES } from '../game/letterBag';
 import { ROUNDS } from '../game/rounds';
 import { validateBoard } from '../game/validator';
+import { scoreRuns } from '../game/scoring';
+import { boardFromSolution, type SolutionCell } from '../game/adminSolve';
 import type { Tile } from '../game/types';
 
 function formatTime(totalSeconds: number): string {
@@ -56,9 +57,21 @@ interface GameScreenProps {
   // daily mode uses this to record the completion server-side.
   onRoundComplete?: (round: number) => void;
   onPlayAgain?: () => void;
+  // Admin/testing shortcut: when provided, shows a "Complete Puzzle"
+  // button that jumps straight to the finished state using this
+  // pre-solved reference board (see build plan section 6). Only wired up
+  // for daily mode, which has one available for free from the generator.
+  adminSolution?: SolutionCell[];
+  onAdminComplete?: () => void;
 }
 
-export function GameScreen({ roundLetters, onRoundComplete, onPlayAgain }: GameScreenProps) {
+export function GameScreen({
+  roundLetters,
+  onRoundComplete,
+  onPlayAgain,
+  adminSolution,
+  onAdminComplete,
+}: GameScreenProps) {
   const [state, dispatch] = useReducer(gameReducer, roundLetters, createInitialState);
   const [activeTileId, setActiveTileId] = useState<string | null>(null);
   const [, forceTick] = useState(0);
@@ -81,15 +94,10 @@ export function GameScreen({ roundLetters, onRoundComplete, onPlayAgain }: GameS
   // Live, whole-board recompute — used to know what completing the current
   // round would lock in, and as the ceiling once it does. Not shown
   // directly once a round is locked; see displayScore below.
-  const liveScore = useMemo(() => {
-    let total = 0;
-    for (const run of validation.runs) {
-      if (isValidWord(run.word)) {
-        total += run.cells.reduce((sum, [r, c]) => sum + LETTER_VALUES[state.board[r][c]!.letter], 0);
-      }
-    }
-    return total;
-  }, [validation.runs, state.board]);
+  const liveScore = useMemo(
+    () => scoreRuns(validation.runs, state.board),
+    [validation.runs, state.board],
+  );
 
   const lockedTotal = useMemo(
     () => state.roundScores.reduce((a, b) => a + b, 0),
@@ -110,6 +118,31 @@ export function GameScreen({ roundLetters, onRoundComplete, onPlayAgain }: GameS
   }, [state.rack, state.board]);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+
+  // Keyboard-placement shortcut: press a letter key to drop a matching
+  // rack tile at whatever board cell the mouse is currently hovering.
+  // Refs (not state) so the listener is attached once and never goes
+  // stale, rather than re-attaching on every hover/rack change.
+  const hoveredCellRef = useRef<{ r: number; c: number } | null>(null);
+  const rackRef = useRef(state.rack);
+  rackRef.current = state.rack;
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      if (target && ['INPUT', 'TEXTAREA'].includes(target.tagName)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const letter = e.key.toUpperCase();
+      if (letter.length !== 1 || letter < 'A' || letter > 'Z') return;
+      const cell = hoveredCellRef.current;
+      if (!cell) return;
+      const tile = rackRef.current.find((t) => t.letter === letter);
+      if (!tile) return;
+      dispatch({ type: 'MOVE_TILE', tileId: tile.id, to: { kind: 'board', r: cell.r, c: cell.c } });
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   function handleDragStart(event: DragStartEvent) {
     setActiveTileId(event.active.id as string);
@@ -132,12 +165,26 @@ export function GameScreen({ roundLetters, onRoundComplete, onPlayAgain }: GameS
   const activeTile = activeTileId ? (allTiles.get(activeTileId) ?? null) : null;
   const isLastRound = state.round >= ROUNDS - 1;
 
+  function handleAdminComplete() {
+    if (!adminSolution) return;
+    const result = boardFromSolution(adminSolution);
+    if (!result) return;
+    dispatch({ type: 'ADMIN_COMPLETE', board: result.board, score: result.score });
+    onAdminComplete?.();
+  }
+
   return (
     <>
       <Hud round={state.round} elapsedSeconds={elapsedSeconds} score={displayScore} />
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <Board board={state.board} cellStatus={validation.cellStatus} />
+        <Board
+          board={state.board}
+          cellStatus={validation.cellStatus}
+          onHoverCell={(cell) => {
+            hoveredCellRef.current = cell;
+          }}
+        />
         <Rack rack={state.rack} />
         <DragOverlay>
           {activeTile ? (
@@ -174,6 +221,12 @@ export function GameScreen({ roundLetters, onRoundComplete, onPlayAgain }: GameS
           state.round,
         )}
       </div>
+
+      {adminSolution && !finished && (
+        <button className="admin-btn" style={{ marginTop: '12px' }} onClick={handleAdminComplete}>
+          Admin: Complete Puzzle
+        </button>
+      )}
 
       <Overlay
         show={finished}

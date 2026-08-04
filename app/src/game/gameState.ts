@@ -40,7 +40,11 @@ export type GameAction =
   | { type: 'ADVANCE_ROUND'; liveScore: number }
   | { type: 'RESTART' }
   | { type: 'UNDO' }
-  | { type: 'REDO' };
+  | { type: 'REDO' }
+  // Admin/testing shortcut: jump straight to a finished game with a given
+  // (already-solved, already-translated-to-fit-the-board) board and final
+  // score, skipping manual play entirely. See GameScreen's admin button.
+  | { type: 'ADMIN_COMPLETE'; board: Board; score: number };
 
 const MAX_HISTORY = 50;
 
@@ -150,6 +154,21 @@ function advanceRound(state: GameState, liveScore: number): GameState {
   };
 }
 
+function adminComplete(state: GameState, board: Board, score: number): GameState {
+  const now = Date.now();
+  const roundScores = Array.from({ length: ROUNDS }, (_, i) => (i === ROUNDS - 1 ? score : 0));
+  const roundCompletedAt = Array.from({ length: ROUNDS }, () => now);
+  return {
+    ...state,
+    board,
+    rack: [],
+    round: ROUNDS,
+    endTime: now,
+    roundScores,
+    roundCompletedAt,
+  };
+}
+
 function undo(state: GameState): GameState {
   if (state.history.length === 0) return state;
   const previous = state.history[state.history.length - 1];
@@ -180,6 +199,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return undo(state);
     case 'REDO':
       return redo(state);
+    case 'ADMIN_COMPLETE':
+      return adminComplete(state, action.board, action.score);
     default:
       return state;
   }

@@ -40,7 +40,14 @@ export function SignIn({ onSignIn }: SignInProps) {
           placeholder="Username"
           maxLength={24}
           disabled={submitting}
-          style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid var(--tile-edge)', fontSize: '14px' }}
+          style={{
+            width: '100%',
+            padding: '10px',
+            borderRadius: '8px',
+            border: '1px solid var(--border)',
+            fontSize: '14px',
+            fontFamily: 'inherit',
+          }}
         />
         {error && <div style={{ color: 'var(--invalid)', fontSize: '12px', marginTop: '8px' }}>{error}</div>}
         <button type="submit" disabled={submitting} style={{ marginTop: '16px' }}>
