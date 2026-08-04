@@ -11,6 +11,10 @@ export interface GameState {
   endTime: number | null;
   history: Snapshot[];
   future: Snapshot[];
+  // Fixed per-round letters for daily-puzzle mode (from Supabase's
+  // daily_puzzles.rounds), sourced instead of the random letter bag.
+  // Undefined in practice mode, where rounds deal randomly as before.
+  roundLetters?: string[];
 }
 
 interface Snapshot {
@@ -32,15 +36,24 @@ function dealTiles(n: number): Tile[] {
   return dealLetters(n).map((letter) => ({ id: crypto.randomUUID(), letter }));
 }
 
-export function createInitialState(): GameState {
+function lettersToTiles(letters: string): Tile[] {
+  return [...letters].map((letter) => ({ id: crypto.randomUUID(), letter }));
+}
+
+function tilesForRound(round: number, roundLetters?: string[]): Tile[] {
+  return roundLetters ? lettersToTiles(roundLetters[round]) : dealTiles(DEALS[round]);
+}
+
+export function createInitialState(roundLetters?: string[]): GameState {
   return {
     board: createBoard(ROWS, COLS),
-    rack: dealTiles(DEALS[0]),
+    rack: tilesForRound(0, roundLetters),
     round: 0,
     startTime: Date.now(),
     endTime: null,
     history: [],
     future: [],
+    roundLetters,
   };
 }
 
@@ -113,7 +126,7 @@ function advanceRound(state: GameState): GameState {
   return {
     ...state,
     round: nextRound,
-    rack: [...state.rack, ...dealTiles(DEALS[nextRound])],
+    rack: [...state.rack, ...tilesForRound(nextRound, state.roundLetters)],
   };
 }
 
@@ -142,7 +155,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'ADVANCE_ROUND':
       return advanceRound(state);
     case 'RESTART':
-      return createInitialState();
+      return createInitialState(state.roundLetters);
     case 'UNDO':
       return undo(state);
     case 'REDO':
