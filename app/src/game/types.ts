@@ -11,13 +11,11 @@ export interface WordRun {
   orientation: 'across' | 'down';
 }
 
-export interface CellStatus {
-  status: 'valid' | 'invalid';
-}
+export type TileStatus = 'valid' | 'invalid' | 'incomplete';
 
 export interface ValidationResult {
   runs: WordRun[];
-  cellStatus: Map<string, 'valid' | 'invalid'>;
+  cellStatus: Map<string, TileStatus>;
   hasIsolatedTiles: boolean;
   allWordsValid: boolean;
   isConnected: boolean;

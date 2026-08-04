@@ -1,10 +1,10 @@
 import { getRuns, isBoardConnected } from './board';
 import { isValidWord } from './dictionary';
-import type { Board, ValidationResult } from './types';
+import type { Board, TileStatus, ValidationResult } from './types';
 
 export function validateBoard(board: Board, rackEmpty: boolean): ValidationResult {
   const runs = getRuns(board);
-  const cellStatus = new Map<string, 'valid' | 'invalid'>();
+  const cellStatus = new Map<string, TileStatus>();
   const inRun = new Set<string>();
   let allWordsValid = true;
 
@@ -29,7 +29,7 @@ export function validateBoard(board: Board, rackEmpty: boolean): ValidationResul
       const key = `${r},${c}`;
       if (!inRun.has(key)) {
         hasIsolatedTiles = true;
-        cellStatus.set(key, 'invalid');
+        cellStatus.set(key, 'incomplete');
       }
     }
   }

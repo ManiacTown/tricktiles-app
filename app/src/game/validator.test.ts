@@ -62,7 +62,7 @@ describe('validateBoard', () => {
     place(board, 0, 4, 'S');
     const result = validateBoard(board, true);
     expect(result.hasIsolatedTiles).toBe(true);
-    expect(result.cellStatus.get('0,4')).toBe('invalid');
+    expect(result.cellStatus.get('0,4')).toBe('incomplete');
     expect(result.complete).toBe(false);
   });
 });
