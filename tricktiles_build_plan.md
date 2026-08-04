@@ -18,13 +18,13 @@ These aren't bugs, they're design calls the prototype dodged. Pinned down before
 
 ## 1. Core mechanic fixes (from the prototype)
 
-- [ ] **Connectivity validation** — prototype only checks that each run of 2+ letters is a real word. It does not check that all tiles form a single connected structure. Add a flood-fill/graph check across the board.
-- [ ] **Real dictionary** — prototype uses a ~6k-word Google common-words list for demo speed. Swap in a real Scrabble/Bananagrams word source (TWL06, SOWPODS, or similar) before this is trustworthy as a real game.
-- [ ] **Word list needs a trie/DAWG structure**, not a flat Set — you'll want this shared between the client validator and the solver service anyway, so build it once, use it twice.
-- [ ] **Touch/mobile drag-and-drop** — prototype uses HTML5 native drag events, which are desktop-only. This needs to be rebuilt on pointer events (`pointerdown`/`pointermove`/`pointerup`) or a library like `dnd-kit` for real mobile support. This is a rewrite of the interaction layer, not a patch.
-- [ ] **Tile swap on occupied cell** — right now dropping on an occupied cell just silently fails. Real Bananagrams play involves shuffling letters around constantly; you'll want drop-to-swap, not drop-to-reject.
-- [ ] **Undo/redo** — losing your arrangement because of a misdrag with no way back is a bad feel for a puzzle game.
-- [ ] **Board bounds** — 13x13 was arbitrary. Decide the real max tile count across all rounds and size the board (or make it scrollable/expandable) accordingly.
+- [x] **Connectivity validation** — done in `app/src/game/board.ts` (`isBoardConnected`, flood-fill) + `validator.ts`. Enforces the strict single-cluster rule locked in section 0.
+- [x] **Real dictionary** — done. Swapped in ENABLE1 (public domain, 172k words, the standard free stand-in for TWL06/SOWPODS) in `app/src/data/enable1.txt`.
+- [x] **Word list needs a trie/DAWG structure** — done, `app/src/game/trie.ts`. Client validator uses it now; solver service (section 4) should reuse the same structure.
+- [x] **Touch/mobile drag-and-drop** — done, rebuilt on `dnd-kit` (Pointer Events under the hood) in `app/src/components/`. Verified working via headless-browser drag simulation.
+- [x] **Tile swap on occupied cell** — done in `gameState.ts`'s `MOVE_TILE` reducer action, verified in-browser.
+- [x] **Undo/redo** — done, history/future snapshot stacks in `gameState.ts`, wired to Undo/Redo buttons.
+- [ ] **Board bounds** — still open. Kept 13x13 as a placeholder (matches prototype) since this wasn't one of the section 0 decisions locked in; revisit once real max tile count across rounds is decided.
 
 ---
 
