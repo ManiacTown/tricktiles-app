@@ -74,9 +74,9 @@ This is the piece that needs the most design thought, not just code.
 
 ## 5. Scoring & feedback polish
 
-- [ ] Cumulative vs per-round scoring — prototype recomputes live score from everything currently valid on the board. Decide if points should "lock in" per round (so rearranging later rounds doesn't retroactively change earlier round's score).
-- [ ] Combo/bonus system — reward for longer words, using rare letters (Q/Z/X/J), or fast round completion, similar to how Pushdle rewards risk.
-- [ ] End screen needs the actual final design pass — prototype's is a placeholder. Worth matching whatever visual identity you land on for the rest of the game.
+- [x] **Per-round score locking** — done. `gameState.ts`'s `advanceRound` locks each round's score as a delta from the cumulative live score the moment it completes (`roundScores: number[]`, immutable once set); the running total is just their sum. The HUD (`GameScreen.tsx`'s `displayScore`) floors at the locked total so temporarily disturbing an earlier round's words while building a new one never shows a scary live dip — but a round's *own* completion delta can legitimately be negative if you damage earlier value and don't fix it before completing, which is honest, not a bug. Covered by 4 new unit tests (lock-in, immutability, negative-delta, timestamps); the HUD wiring itself was only smoke-tested (no console errors), not deeply re-verified live, since the underlying logic is what actually matters for correctness.
+- [ ] **Combo/bonus system** — explicitly deferred. Decided to ship plain letter-value-sum scoring for now rather than invent bonus thresholds without real play data to tune them against.
+- [x] **End screen structure** (not full visual design) — added a round-by-round breakdown table (round number, time, score) to `Overlay.tsx`, using the existing placeholder felt/wood/card theme. Full visual redesign explicitly deferred to section 7, since the visual identity itself isn't decided yet. Not screenshot-verified in a real completed 5-round game this session — scripting a full deterministic win would need the solver to extend from an existing board per round, which only `solver/cmd/publish`'s internal `SolveFrom` does; the public `/solvability` endpoint only solves from empty. Logic is unit-tested; the table's exact rendering is unverified.
 
 ---
 

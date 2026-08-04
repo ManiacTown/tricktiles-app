@@ -78,7 +78,10 @@ export function GameScreen({ roundLetters, onRoundComplete, onPlayAgain }: GameS
     [state.board, state.rack.length],
   );
 
-  const score = useMemo(() => {
+  // Live, whole-board recompute — used to know what completing the current
+  // round would lock in, and as the ceiling once it does. Not shown
+  // directly once a round is locked; see displayScore below.
+  const liveScore = useMemo(() => {
     let total = 0;
     for (const run of validation.runs) {
       if (isValidWord(run.word)) {
@@ -87,6 +90,17 @@ export function GameScreen({ roundLetters, onRoundComplete, onPlayAgain }: GameS
     }
     return total;
   }, [validation.runs, state.board]);
+
+  const lockedTotal = useMemo(
+    () => state.roundScores.reduce((a, b) => a + b, 0),
+    [state.roundScores],
+  );
+
+  // Floored at the locked total so temporarily disturbing an earlier
+  // round's words while building the current one never shows as a scary
+  // dip — the number can only drop for real once the round is completed
+  // and locks in (see gameState.ts's advanceRound).
+  const displayScore = Math.max(lockedTotal, liveScore);
 
   const allTiles = useMemo(() => {
     const map = new Map<string, Tile>();
@@ -120,7 +134,7 @@ export function GameScreen({ roundLetters, onRoundComplete, onPlayAgain }: GameS
 
   return (
     <>
-      <Hud round={state.round} elapsedSeconds={elapsedSeconds} score={score} />
+      <Hud round={state.round} elapsedSeconds={elapsedSeconds} score={displayScore} />
 
       <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
         <Board board={state.board} cellStatus={validation.cellStatus} />
@@ -142,7 +156,7 @@ export function GameScreen({ roundLetters, onRoundComplete, onPlayAgain }: GameS
         onNext={() => {
           if (!validation.complete) return;
           onRoundComplete?.(state.round + 1);
-          dispatch({ type: 'ADVANCE_ROUND' });
+          dispatch({ type: 'ADVANCE_ROUND', liveScore });
         }}
         canUndo={state.history.length > 0}
         canRedo={state.future.length > 0}
@@ -164,7 +178,14 @@ export function GameScreen({ roundLetters, onRoundComplete, onPlayAgain }: GameS
       <Overlay
         show={finished}
         finalTime={formatTime(elapsedSeconds)}
-        finalScore={score}
+        finalScore={lockedTotal}
+        rounds={state.roundScores.map((roundScore, i) => ({
+          round: i + 1,
+          score: roundScore,
+          elapsedSeconds: Math.floor(
+            (state.roundCompletedAt[i] - (i === 0 ? state.startTime : state.roundCompletedAt[i - 1])) / 1000,
+          ),
+        }))}
         onPlayAgain={onPlayAgain ?? (() => dispatch({ type: 'RESTART' }))}
       />
     </>

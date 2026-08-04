@@ -15,6 +15,14 @@ export interface GameState {
   // daily_puzzles.rounds), sourced instead of the random letter bag.
   // Undefined in practice mode, where rounds deal randomly as before.
   roundLetters?: string[];
+  // Per-round locked score deltas (index 0 = round 1, etc.), set once when
+  // that round completes and never recomputed afterward — so rearranging
+  // an earlier round's tiles while working on a later one can't
+  // retroactively change what's already been "banked." Sum for the total.
+  roundScores: number[];
+  // Wall-clock time each round completed, parallel to roundScores — used
+  // for the end screen's round-by-round breakdown.
+  roundCompletedAt: number[];
 }
 
 interface Snapshot {
@@ -25,7 +33,11 @@ interface Snapshot {
 export type GameAction =
   | { type: 'MOVE_TILE'; tileId: string; to: { kind: 'rack' } | { kind: 'board'; r: number; c: number } }
   | { type: 'SHUFFLE_RACK' }
-  | { type: 'ADVANCE_ROUND' }
+  // liveScore is the full-board score at the moment the round completes,
+  // computed by the caller (which already has the validator result) — the
+  // reducer derives this round's own delta from it rather than
+  // re-running word validation itself.
+  | { type: 'ADVANCE_ROUND'; liveScore: number }
   | { type: 'RESTART' }
   | { type: 'UNDO' }
   | { type: 'REDO' };
@@ -54,6 +66,8 @@ export function createInitialState(roundLetters?: string[]): GameState {
     history: [],
     future: [],
     roundLetters,
+    roundScores: [],
+    roundCompletedAt: [],
   };
 }
 
@@ -118,14 +132,20 @@ function shuffleRack(state: GameState): GameState {
   return { ...state, rack };
 }
 
-function advanceRound(state: GameState): GameState {
+function advanceRound(state: GameState, liveScore: number): GameState {
+  const previouslyLocked = state.roundScores.reduce((a, b) => a + b, 0);
+  const roundScores = [...state.roundScores, liveScore - previouslyLocked];
+  const roundCompletedAt = [...state.roundCompletedAt, Date.now()];
+
   const nextRound = state.round + 1;
   if (nextRound >= ROUNDS) {
-    return { ...state, round: ROUNDS, endTime: Date.now() };
+    return { ...state, round: ROUNDS, endTime: Date.now(), roundScores, roundCompletedAt };
   }
   return {
     ...state,
     round: nextRound,
+    roundScores,
+    roundCompletedAt,
     rack: [...state.rack, ...tilesForRound(nextRound, state.roundLetters)],
   };
 }
@@ -153,7 +173,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'SHUFFLE_RACK':
       return shuffleRack(state);
     case 'ADVANCE_ROUND':
-      return advanceRound(state);
+      return advanceRound(state, action.liveScore);
     case 'RESTART':
       return createInitialState(state.roundLetters);
     case 'UNDO':
