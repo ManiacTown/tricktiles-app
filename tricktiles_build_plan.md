@@ -52,12 +52,12 @@ This is the piece that needs the most design thought, not just code.
 
 ## 4. Solver service (Go)
 
-- [ ] Stand this up as a **standalone microservice** with a clean API boundary (input: current board state + available tiles, output: valid placement / best move / solvability check) — same reasoning as before: it's stateless, CPU-bound, and doesn't need to share a language with the rest of the app.
-- [ ] Core data structure: **trie or DAWG** built from the same word list as the client, for fast prefix/anagram lookups.
-- [ ] Two solver modes worth separating:
-  - **Solvability check** (used by the puzzle generator — "does at least one solution exist?")
-  - **Best-move / hint generator** (used in-game if you want a hint system, and for any "here's how a top player solved it" feature post-game)
-- [ ] Decide early whether the solver needs to reason about the *whole* board (full Bananagrams solve, expensive) or just validate/extend incrementally (cheaper, probably sufficient for hints).
+- [x] Stood up as a **standalone microservice** in `solver/` (net/http, no framework). `POST /solvability {letters}` -> `{solvable, timedOut, solution}`, `GET /health`.
+- [x] Core data structure: **trie**, built from the same ENABLE1 word list as the client (`solver/dictionary/`, mirrors `app/src/game/trie.ts`). Copied file for now — worth a follow-up to generate both from one source of truth instead of hand-keeping two copies in sync.
+- [x] **Solvability check** implemented — backtracking search (`solver/solve/`) that places all given letters into one connected, all-valid-words grid, or proves it can't. Move generation anchors on existing tiles (crossing/extension); every candidate is verified by recomputing runs against the dictionary. A budget cap distinguishes proven-unsolvable from an inconclusive timeout. Verified fast on realistic 8-10 letter round sizes (2-5ms) and on adversarial rare-letter/vowel-only inputs (no timeouts).
+  - Known scope gap: doesn't search placements where two words are only edge-adjacent without sharing a letter — acceptable since the generator already regenerates on a failed check.
+- [ ] **Best-move / hint generator** — not built yet. Deferred; not needed until the in-game hint system / post-game "how a top player solved it" feature is prioritized.
+- [x] Decided implicitly by the solvability-check implementation: it reasons about the whole board (full backtracking solve), since "does at least one solution exist" requires that. A cheaper incremental validate/extend mode is still open for the eventual hint generator.
 
 ---
 
