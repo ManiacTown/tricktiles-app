@@ -7,7 +7,7 @@ import { SignIn } from './SignIn';
 import { GameScreen } from './GameScreen';
 
 export function DailyChallenge() {
-  const { loading: authLoading, session, profile, signInWithUsername } = useAuth();
+  const { loading: authLoading, session, profile, signUp, signIn } = useAuth();
   const [puzzle, setPuzzle] = useState<DailyPuzzleRow | null>(null);
   const [gameSession, setGameSession] = useState<GameSessionRow | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +37,7 @@ export function DailyChallenge() {
   }
 
   if (!session || !profile) {
-    return <SignIn onSignIn={signInWithUsername} />;
+    return <SignIn onSignUp={signUp} onSignIn={signIn} />;
   }
 
   if (error) {

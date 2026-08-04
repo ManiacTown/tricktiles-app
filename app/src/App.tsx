@@ -36,9 +36,19 @@ function App() {
         ))}
       </div>
 
-      {mode === 'daily' && <DailyChallenge />}
-      {mode === 'practice' && <GameScreen key="practice" />}
-      {mode === 'profile' && <Profile />}
+      {/* All three tabs stay mounted and are only hidden via CSS, rather
+          than conditionally rendered — switching tabs would otherwise
+          unmount/remount each one, losing the in-progress board, fetched
+          daily puzzle, etc. every time. */}
+      <div style={{ display: mode === 'daily' ? 'contents' : 'none' }}>
+        <DailyChallenge />
+      </div>
+      <div style={{ display: mode === 'practice' ? 'contents' : 'none' }}>
+        <GameScreen />
+      </div>
+      <div style={{ display: mode === 'profile' ? 'contents' : 'none' }}>
+        <Profile />
+      </div>
     </>
   );
 }

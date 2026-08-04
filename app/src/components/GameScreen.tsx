@@ -74,6 +74,13 @@ export function GameScreen({
 }: GameScreenProps) {
   const [state, dispatch] = useReducer(gameReducer, roundLetters, createInitialState);
   const [activeTileId, setActiveTileId] = useState<string | null>(null);
+  // The dragged tile's own on-screen size at the moment the drag starts —
+  // applied explicitly to the DragOverlay clone so it renders at its real
+  // original size (rack tile, or whatever size the board cell currently
+  // is, zoom included) instead of falling back to the base .tile CSS's
+  // percentage sizing, which has no meaningful parent to resolve against
+  // inside the overlay portal.
+  const [activeTileSize, setActiveTileSize] = useState<{ width: number; height: number } | null>(null);
   const [, forceTick] = useState(0);
 
   const finished = state.endTime !== null;
@@ -146,10 +153,13 @@ export function GameScreen({
 
   function handleDragStart(event: DragStartEvent) {
     setActiveTileId(event.active.id as string);
+    const rect = event.active.rect.current.initial;
+    setActiveTileSize(rect ? { width: rect.width, height: rect.height } : null);
   }
 
   function handleDragEnd(event: DragEndEvent) {
     setActiveTileId(null);
+    setActiveTileSize(null);
     const { active, over } = event;
     if (!over) return;
     const tileId = active.id as string;
@@ -187,8 +197,11 @@ export function GameScreen({
         />
         <Rack rack={state.rack} />
         <DragOverlay>
-          {activeTile ? (
-            <div className="tile">
+          {activeTile && activeTileSize ? (
+            <div
+              className="tile"
+              style={{ width: activeTileSize.width, height: activeTileSize.height }}
+            >
               {activeTile.letter}
               <span className="pts">{LETTER_VALUES[activeTile.letter]}</span>
             </div>

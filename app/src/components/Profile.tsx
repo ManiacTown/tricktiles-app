@@ -10,7 +10,7 @@ function formatTime(totalSeconds: number): string {
 }
 
 export function Profile() {
-  const { loading: authLoading, session, profile, signInWithUsername } = useAuth();
+  const { loading: authLoading, session, profile, signUp, signIn, signOut } = useAuth();
   const [stats, setStats] = useState<ProfileStats | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,7 +34,7 @@ export function Profile() {
   }
 
   if (!session || !profile) {
-    return <SignIn onSignIn={signInWithUsername} />;
+    return <SignIn onSignUp={signUp} onSignIn={signIn} />;
   }
 
   return (
@@ -74,6 +74,10 @@ export function Profile() {
           </div>
         </div>
       )}
+
+      <button className="admin-btn" style={{ marginTop: '20px', width: '100%' }} onClick={signOut}>
+        Sign Out
+      </button>
     </div>
   );
 }
