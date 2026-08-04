@@ -32,11 +32,13 @@ These aren't bugs, they're design calls the prototype dodged. Pinned down before
 
 This is the piece that needs the most design thought, not just code.
 
-- [ ] Decide generation approach: **algorithmic** (build backward from a target word set, guarantee solvability) vs **AI-assisted** (LLM proposes tile sets/word themes, algorithmic layer validates/repairs). A hybrid is realistic: AI for variety/theming, algorithm for the solvability guarantee.
-- [ ] **Seeded RNG** so the same calendar date produces the same puzzle for everyone — needs a deterministic seed (e.g. date string → hash → seeded PRNG), not `Math.random()`.
-- [ ] **Solvability guarantee** — every generated puzzle should have at least one valid solution path using the solver (see section 4) before it's ever served to a player. Generate, solve-check, regenerate if it fails.
-- [ ] **Difficulty calibration** — track letter rarity (Q, Z, X, J are hard to place), average word length required, and total tile count as difficulty knobs. Worth logging solver stats (time to solve, number of valid arrangements found) per generated puzzle to build a difficulty curve over time.
-- [ ] **Timezone handling for "daily"** — decide what "midnight" means (UTC vs player-local) and be consistent, or players in different timezones get different puzzle-drop times.
+- [x] Decided (implicitly, by building it): **algorithmic**, not AI-assisted — `solver/generate/` deals from the real letter bag and proves solvability via the backtracking solver, no LLM step. Revisit if theming/variety ever becomes a goal worth an AI-assisted layer.
+- [x] **Seeded RNG** — `solver/generate/generate.go`'s `seedFromDate`: SHA-256("tricktiles-daily:"+date) feeds a `math/rand/v2` PCG source. Verified deterministic (same date → byte-identical tile sequence *and* board layout across separate process runs) and distinct across different dates.
+- [x] **Solvability guarantee** — implemented exactly as specified: draw a round's tiles, call the solver (extending from the previous rounds' board via `solve.SolveFrom`), accept if solvable, else redraw (up to 25 attempts/round) and retry. Verified: every generated puzzle's final board is connected, has no isolated tiles, and every run is a real dictionary word.
+- [x] **Difficulty calibration groundwork** — `RoundResult` captures attempts-needed and elapsed time per round (the "solver stats" the plan asks for), though nothing persists or aggregates them into a difficulty curve yet — no storage layer exists until section 3.
+- [x] **Timezone handling** — decided UTC: the date string fed into the seed is a UTC calendar date (`"2006-01-02"`). Pragmatic default, not a section 0 locked decision — revisit if player complaints about drop-time make it worth per-region handling.
+
+**Known limitation:** generation is correct but not fast for later rounds — candidate-generation cost in the solver grows with existing board size, so round 4-5 (extending a 30+ tile board) can take seconds to tens of seconds per attempt (observed up to ~22s for one round-5 attempt; a full 5-round daily generation took ~19s end-to-end via the `/daily` endpoint). This is fine for an offline once-per-day batch job (the intended use — see `handleGenerateDaily`'s doc comment) but would not be acceptable on a live request path. Optimization (cross-check-set pruning, tighter per-attempt budgets, memoization) is a real follow-up, not yet done.
 
 ---
 

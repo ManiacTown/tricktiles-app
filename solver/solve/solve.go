@@ -45,11 +45,20 @@ type solver struct {
 }
 
 // Solve searches for a full arrangement of letters into one connected,
-// valid Bananagrams grid.
+// valid Bananagrams grid, starting from an empty board.
 func Solve(trie *dictionary.Trie, letters string) Result {
+	return SolveFrom(trie, board.New(), letters)
+}
+
+// SolveFrom searches for a way to place `letters` onto an existing,
+// already-valid board such that the result is still one connected,
+// all-valid-words grid. This is what the daily-puzzle generator uses to
+// prove each round's deal can extend the previous rounds' board, rather
+// than just being solvable in isolation.
+func SolveFrom(trie *dictionary.Trie, start board.Board, letters string) Result {
 	remaining := dictionary.LetterCounts(letters)
 	s := &solver{trie: trie, budget: defaultBudget}
-	brd, ok := s.search(board.New(), remaining)
+	brd, ok := s.search(start.Clone(), remaining)
 	return Result{Board: brd, Solvable: ok, TimedOut: !ok && s.budget <= 0}
 }
 
@@ -112,7 +121,10 @@ func (s *solver) candidates(brd board.Board, remaining [26]int) []map[board.Poin
 	var out []map[board.Point]byte
 	seen := map[string]bool{}
 	dirs := [2]board.Point{{R: 0, C: 1}, {R: 1, C: 0}}
-	for anchor := range brd {
+	// Sorted rather than ranged directly: map iteration order is randomized
+	// per process, which would make the specific solution layout chosen
+	// (though always valid) non-reproducible across runs of the same input.
+	for _, anchor := range sortedPoints(brd) {
 		for _, dir := range dirs {
 			for k := 0; k < maxWordLen; k++ {
 				start := board.Point{R: anchor.R - dir.R*k, C: anchor.C - dir.C*k}
@@ -196,9 +208,9 @@ func emit(path map[board.Point]byte, out *[]map[board.Point]byte, seen map[strin
 	*out = append(*out, cp)
 }
 
-func canonicalKey(path map[board.Point]byte) string {
-	pts := make([]board.Point, 0, len(path))
-	for p := range path {
+func sortedPoints(brd board.Board) []board.Point {
+	pts := make([]board.Point, 0, len(brd))
+	for p := range brd {
 		pts = append(pts, p)
 	}
 	sort.Slice(pts, func(i, j int) bool {
@@ -207,6 +219,11 @@ func canonicalKey(path map[board.Point]byte) string {
 		}
 		return pts[i].C < pts[j].C
 	})
+	return pts
+}
+
+func canonicalKey(path map[board.Point]byte) string {
+	pts := sortedPoints(path)
 	var sb strings.Builder
 	for _, p := range pts {
 		sb.WriteString(strconv.Itoa(p.R))
