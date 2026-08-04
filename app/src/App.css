@@ -215,6 +215,17 @@ button:disabled {
   color: var(--paper);
   border: 1px solid rgba(255, 255, 255, 0.15);
 }
+
+.mode-tab {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--paper);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+.mode-tab.active {
+  background: var(--amber);
+  color: #241c14;
+  border-color: var(--amber);
+}
 #nextBtn {
   background: var(--amber);
   color: #241c14;
@@ -261,6 +272,7 @@ button:disabled {
   margin: 0 0 4px;
   font-family: 'Special Elite', monospace;
   letter-spacing: 1px;
+  overflow-wrap: break-word;
 }
 .card .big {
   font-size: 34px;

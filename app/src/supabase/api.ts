@@ -68,3 +68,31 @@ export async function getLeaderboard(puzzleId: string, limit = 50): Promise<Lead
   if (error) throw error;
   return data as LeaderboardRow[];
 }
+
+export interface ProfileStats {
+  gamesPlayed: number;
+  bestTimeSeconds: number | null;
+  averageTimeSeconds: number | null;
+}
+
+// Derived from the same leaderboard view (completed sessions only, elapsed
+// time from server-timestamped round_completions) rather than a separate
+// query — one source of truth for "how fast did this player finish."
+export async function getProfileStats(userId: string): Promise<ProfileStats> {
+  const { data, error } = await supabase
+    .from('leaderboard')
+    .select('elapsed_seconds')
+    .eq('user_id', userId)
+    .returns<Array<{ elapsed_seconds: number }>>();
+  if (error) throw error;
+
+  const times = (data ?? []).map((row) => row.elapsed_seconds);
+  if (times.length === 0) {
+    return { gamesPlayed: 0, bestTimeSeconds: null, averageTimeSeconds: null };
+  }
+  return {
+    gamesPlayed: times.length,
+    bestTimeSeconds: Math.min(...times),
+    averageTimeSeconds: Math.round(times.reduce((a, b) => a + b, 0) / times.length),
+  };
+}

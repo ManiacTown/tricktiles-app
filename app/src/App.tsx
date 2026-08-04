@@ -2,8 +2,15 @@ import { useState } from 'react';
 import './App.css';
 import { GameScreen } from './components/GameScreen';
 import { DailyChallenge } from './components/DailyChallenge';
+import { Profile } from './components/Profile';
 
-type Mode = 'daily' | 'practice';
+type Mode = 'daily' | 'practice' | 'profile';
+
+const TABS: Array<{ mode: Mode; label: string }> = [
+  { mode: 'daily', label: 'Daily Challenge' },
+  { mode: 'practice', label: 'Practice' },
+  { mode: 'profile', label: 'Profile' },
+];
 
 function App() {
   const [mode, setMode] = useState<Mode>('daily');
@@ -18,25 +25,20 @@ function App() {
       </header>
 
       <div className="controls" style={{ marginTop: 0, marginBottom: '10px' }}>
-        <button
-          id="shuffleBtn"
-          className={mode === 'daily' ? 'ready' : undefined}
-          style={mode === 'daily' ? { background: 'var(--amber)', color: '#241c14' } : undefined}
-          onClick={() => setMode('daily')}
-        >
-          Daily Challenge
-        </button>
-        <button
-          id="shuffleBtn"
-          className={mode === 'practice' ? 'ready' : undefined}
-          style={mode === 'practice' ? { background: 'var(--amber)', color: '#241c14' } : undefined}
-          onClick={() => setMode('practice')}
-        >
-          Practice
-        </button>
+        {TABS.map((tab) => (
+          <button
+            key={tab.mode}
+            className={`mode-tab${mode === tab.mode ? ' active' : ''}`}
+            onClick={() => setMode(tab.mode)}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {mode === 'daily' ? <DailyChallenge /> : <GameScreen key="practice" />}
+      {mode === 'daily' && <DailyChallenge />}
+      {mode === 'practice' && <GameScreen key="practice" />}
+      {mode === 'profile' && <Profile />}
     </>
   );
 }

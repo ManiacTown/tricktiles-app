@@ -82,10 +82,10 @@ This is the piece that needs the most design thought, not just code.
 
 ## 6. Profile & social layer
 
-- [ ] Profile page: stats (games played, average time, best time, badge case).
-- [ ] Badge display/unlock animation.
-- [ ] Share card for socials (similar function to Pushdle's shareable result — "here's my time/score" image or text block).
-- [ ] Discord integration if you want the same community loop you built for Pushdle.
+- [x] **Profile page** (stats only, no badge case yet — badges aren't built): `Profile.tsx`, new third App.tsx tab. `getProfileStats` in `api.ts` derives games played / best time / average time from the `leaderboard` view (completed sessions only, same server-timestamped elapsed time as everywhere else). Handles not-signed-in (reuses `SignIn`) and zero-games states. Verified live: sign-in gate, then correctly shows "you haven't completed a daily puzzle yet" with a real account and zero completed sessions. Fixed a real bug found while wiring this in: the three mode-tab buttons all reused `id="shuffleBtn"` (invalid duplicate-ID HTML, copy-paste leftover) — replaced with a proper `.mode-tab`/`.mode-tab.active` class.
+- [ ] **Badge display/unlock animation** — explicitly deferred this session (needs badge content defined first, see section 3's badge logic gap).
+- [ ] **Share card for socials** — deferred this session; needs a design-direction decision (text-only vs. generated image) before building.
+- [ ] **Discord integration** — deferred this session; needs a Discord server/bot decision first, similar to how GitHub/Supabase needed account setup before any code could follow.
 
 ---
 
