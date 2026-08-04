@@ -2,3 +2,4 @@
 .gotmp/
 .buildtmp/
 *.exe
+.env
