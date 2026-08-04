@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import {
+  closestCenter,
   DndContext,
   DragOverlay,
   PointerSensor,
@@ -139,7 +140,12 @@ export function GameScreen({
     return map;
   }, [state.rack, state.board]);
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  // A smaller activation distance means the drag itself starts responding
+  // sooner after a pointer-down; closestCenter (rather than the default
+  // rectangle-overlap detection) picks whichever cell's center the
+  // pointer is nearest to, so a cell can register as the drop target
+  // before the dragged tile is even fully over it — the "magnetic" feel.
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 2 } }));
 
   // The cell the next keyboard action targets — real mouse hover normally,
   // or an auto-advanced cell right after a keyboard letter placement (see
@@ -233,9 +239,24 @@ export function GameScreen({
       const above = cell.r > 0 ? board[cell.r - 1][cell.c] : null;
       const left = cell.c > 0 ? board[cell.r][cell.c - 1] : null;
       const vertical = above && !left;
-      const next = vertical ? { r: cell.r + 1, c: cell.c } : { r: cell.r, c: cell.c + 1 };
-      const inBounds = next.r >= 0 && next.r < ROWS && next.c >= 0 && next.c < COLS;
-      setTypingCursor(inBounds ? next : null);
+      const dr = vertical ? 1 : 0;
+      const dc = vertical ? 0 : 1;
+      const inBounds = (p: { r: number; c: number }) => p.r >= 0 && p.r < ROWS && p.c >= 0 && p.c < COLS;
+
+      let next = { r: cell.r + dr, c: cell.c + dc };
+      if (inBounds(next) && board[next.r][next.c]) {
+        // A single occupied cell in the way — hop over it and keep going
+        // in the same direction, rather than landing on (and offering to
+        // overwrite) an existing tile that's likely part of the word
+        // already. Only for exactly one tile of blockage: if the cell
+        // beyond that is also occupied, this isn't a quick hop-over
+        // anymore, so just stop at the blocked cell as before.
+        const afterNext = { r: next.r + dr, c: next.c + dc };
+        if (inBounds(afterNext) && !board[afterNext.r][afterNext.c]) {
+          next = afterNext;
+        }
+      }
+      setTypingCursor(inBounds(next) ? next : null);
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -277,7 +298,12 @@ export function GameScreen({
     <>
       <Hud round={state.round} elapsedSeconds={elapsedSeconds} score={displayScore} />
 
-      <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
         <Board
           board={state.board}
           cellStatus={validation.cellStatus}
@@ -302,10 +328,8 @@ export function GameScreen({
       <Controls
         onShuffle={() => dispatch({ type: 'SHUFFLE_RACK' })}
         onUndo={() => dispatch({ type: 'UNDO' })}
-        onRedo={() => dispatch({ type: 'REDO' })}
         onNext={handleCompleteRound}
         canUndo={state.history.length > 0}
-        canRedo={state.future.length > 0}
         ready={validation.complete}
         isLastRound={isLastRound}
       />

@@ -11,7 +11,6 @@ function stateWithRackTiles(letters: string[]): GameState {
     startTime: Date.now(),
     endTime: null,
     history: [],
-    future: [],
     roundScores: [],
     roundCompletedAt: [],
   };
@@ -71,8 +70,8 @@ describe('MOVE_TILE', () => {
   });
 });
 
-describe('UNDO/REDO', () => {
-  it('undoes and redoes a tile move', () => {
+describe('UNDO', () => {
+  it('undoes a tile move', () => {
     const state = stateWithRackTiles(['A']);
     const moved = gameReducer(state, {
       type: 'MOVE_TILE',
@@ -84,15 +83,11 @@ describe('UNDO/REDO', () => {
     const undone = gameReducer(moved, { type: 'UNDO' });
     expect(undone.board[0][0]).toBeNull();
     expect(undone.rack.map((t) => t.id)).toEqual(['tile-0']);
-
-    const redone = gameReducer(undone, { type: 'REDO' });
-    expect(redone.board[0][0]?.letter).toBe('A');
   });
 
-  it('is a no-op when there is nothing to undo or redo', () => {
+  it('is a no-op when there is nothing to undo', () => {
     const state = stateWithRackTiles(['A']);
     expect(gameReducer(state, { type: 'UNDO' })).toBe(state);
-    expect(gameReducer(state, { type: 'REDO' })).toBe(state);
   });
 });
 

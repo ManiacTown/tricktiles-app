@@ -10,7 +10,6 @@ export interface GameState {
   startTime: number;
   endTime: number | null;
   history: Snapshot[];
-  future: Snapshot[];
   // Fixed per-round letters for daily-puzzle mode (from Supabase's
   // daily_puzzles.rounds), sourced instead of the random letter bag.
   // Undefined in practice mode, where rounds deal randomly as before.
@@ -40,7 +39,6 @@ export type GameAction =
   | { type: 'ADVANCE_ROUND'; liveScore: number }
   | { type: 'RESTART' }
   | { type: 'UNDO' }
-  | { type: 'REDO' }
   // Admin/testing shortcut: jump straight to a finished game with a given
   // (already-solved, already-translated-to-fit-the-board) board and final
   // score, skipping manual play entirely. See GameScreen's admin button.
@@ -68,7 +66,6 @@ export function createInitialState(roundLetters?: string[]): GameState {
     startTime: Date.now(),
     endTime: null,
     history: [],
-    future: [],
     roundLetters,
     roundScores: [],
     roundCompletedAt: [],
@@ -79,9 +76,9 @@ function cloneSnapshot(state: GameState): Snapshot {
   return { board: structuredClone(state.board), rack: structuredClone(state.rack) };
 }
 
-function pushHistory(state: GameState): Pick<GameState, 'history' | 'future'> {
+function pushHistory(state: GameState): Pick<GameState, 'history'> {
   const history = [...state.history, cloneSnapshot(state)].slice(-MAX_HISTORY);
-  return { history, future: [] };
+  return { history };
 }
 
 function findTile(state: GameState, tileId: string):
@@ -173,16 +170,7 @@ function undo(state: GameState): GameState {
   if (state.history.length === 0) return state;
   const previous = state.history[state.history.length - 1];
   const history = state.history.slice(0, -1);
-  const future = [cloneSnapshot(state), ...state.future].slice(0, MAX_HISTORY);
-  return { ...state, board: previous.board, rack: previous.rack, history, future };
-}
-
-function redo(state: GameState): GameState {
-  if (state.future.length === 0) return state;
-  const next = state.future[0];
-  const future = state.future.slice(1);
-  const history = [...state.history, cloneSnapshot(state)].slice(-MAX_HISTORY);
-  return { ...state, board: next.board, rack: next.rack, history, future };
+  return { ...state, board: previous.board, rack: previous.rack, history };
 }
 
 export function gameReducer(state: GameState, action: GameAction): GameState {
@@ -197,8 +185,6 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return createInitialState(state.roundLetters);
     case 'UNDO':
       return undo(state);
-    case 'REDO':
-      return redo(state);
     case 'ADMIN_COMPLETE':
       return adminComplete(state, action.board, action.score);
     default:
