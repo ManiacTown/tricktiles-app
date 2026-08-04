@@ -6,7 +6,11 @@ import type { DailyPuzzleRow, GameSessionRow } from '../supabase/types';
 import { SignIn } from './SignIn';
 import { GameScreen } from './GameScreen';
 
-export function DailyChallenge() {
+interface DailyChallengeProps {
+  active?: boolean;
+}
+
+export function DailyChallenge({ active = true }: DailyChallengeProps) {
   const { loading: authLoading, session, profile, signUp, signIn } = useAuth();
   const [puzzle, setPuzzle] = useState<DailyPuzzleRow | null>(null);
   const [gameSession, setGameSession] = useState<GameSessionRow | null>(null);
@@ -53,6 +57,7 @@ export function DailyChallenge() {
   return (
     <GameScreen
       key={gameSession.id}
+      active={active}
       roundLetters={roundLetters}
       onRoundComplete={(round) => {
         completeRound(gameSession.id, round).catch((err) => {

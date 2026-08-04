@@ -8,19 +8,24 @@ interface CellProps {
   c: number;
   tile: BoardModel[number][number];
   status?: TileStatus;
+  isTypingCursor: boolean;
   onHoverChange?: (cell: { r: number; c: number } | null) => void;
+  onDeleteTile?: (tileId: string) => void;
 }
 
-function Cell({ r, c, tile, status, onHoverChange }: CellProps) {
+function Cell({ r, c, tile, status, isTypingCursor, onHoverChange, onDeleteTile }: CellProps) {
   const { setNodeRef, isOver } = useDroppable({ id: `cell-${r}-${c}` });
+  const classes = ['cell'];
+  if (isOver) classes.push('dragover');
+  if (isTypingCursor) classes.push('typing-cursor');
   return (
     <div
       ref={setNodeRef}
-      className={`cell${isOver ? ' dragover' : ''}`}
+      className={classes.join(' ')}
       onPointerEnter={() => onHoverChange?.({ r, c })}
       onPointerLeave={() => onHoverChange?.(null)}
     >
-      {tile && <TileView tile={tile} status={status} />}
+      {tile && <TileView tile={tile} status={status} onDelete={onDeleteTile} />}
     </div>
   );
 }
@@ -32,6 +37,13 @@ interface BoardProps {
   // leaves the board) — used for the keyboard-placement shortcut: press a
   // letter key to drop a matching rack tile wherever the mouse is hovering.
   onHoverCell?: (cell: { r: number; c: number } | null) => void;
+  // The cell the next typed letter will land in — either wherever the
+  // mouse is actually hovering, or, after a keyboard placement, the
+  // auto-advanced next cell (see GameScreen). Highlighted so the player
+  // can see where the next keystroke will go without needing the mouse
+  // to still be there.
+  typingCursor?: { r: number; c: number } | null;
+  onDeleteTile?: (tileId: string) => void;
 }
 
 const MIN_ZOOM = 0.6;
@@ -45,7 +57,7 @@ function touchDistance(a: Touch, b: Touch) {
   return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
 }
 
-export function Board({ board, cellStatus, onHoverCell }: BoardProps) {
+export function Board({ board, cellStatus, onHoverCell, typingCursor, onDeleteTile }: BoardProps) {
   const [zoom, setZoom] = useState(1);
   const zoomRef = useRef(zoom);
   zoomRef.current = zoom;
@@ -113,7 +125,9 @@ export function Board({ board, cellStatus, onHoverCell }: BoardProps) {
               c={c}
               tile={tile}
               status={cellStatus.get(`${r},${c}`)}
+              isTypingCursor={typingCursor?.r === r && typingCursor?.c === c}
               onHoverChange={onHoverCell}
+              onDeleteTile={onDeleteTile}
             />
           )),
         )}

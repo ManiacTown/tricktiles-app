@@ -41,10 +41,10 @@ function App() {
           unmount/remount each one, losing the in-progress board, fetched
           daily puzzle, etc. every time. */}
       <div style={{ display: mode === 'daily' ? 'contents' : 'none' }}>
-        <DailyChallenge />
+        <DailyChallenge active={mode === 'daily'} />
       </div>
       <div style={{ display: mode === 'practice' ? 'contents' : 'none' }}>
-        <GameScreen />
+        <GameScreen active={mode === 'practice'} />
       </div>
       <div style={{ display: mode === 'profile' ? 'contents' : 'none' }}>
         <Profile />

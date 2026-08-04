@@ -15,11 +15,11 @@ import { Controls } from './Controls';
 import { Overlay } from './Overlay';
 import { createInitialState, gameReducer } from '../game/gameState';
 import { LETTER_VALUES } from '../game/letterBag';
-import { ROUNDS } from '../game/rounds';
+import { COLS, ROUNDS, ROWS } from '../game/rounds';
 import { validateBoard } from '../game/validator';
 import { scoreRuns } from '../game/scoring';
 import { boardFromSolution, type SolutionCell } from '../game/adminSolve';
-import type { Tile } from '../game/types';
+import type { Board as BoardModel, Tile } from '../game/types';
 
 function formatTime(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60);
@@ -49,6 +49,12 @@ function statusMessage(
   return '';
 }
 
+const NOT_READY_MESSAGES = [
+  "Hold your horses — the board isn't finished yet.",
+  'Not so fast! A few tiles are still homeless.',
+  "Nice try, but this board's not done cooking.",
+];
+
 interface GameScreenProps {
   // Fixed per-round letters for daily-puzzle mode; omitted for practice
   // mode, which deals randomly from the local letter bag instead.
@@ -63,6 +69,14 @@ interface GameScreenProps {
   // for daily mode, which has one available for free from the generator.
   adminSolution?: SolutionCell[];
   onAdminComplete?: () => void;
+  // Whether this GameScreen is the currently-visible tab. App.tsx keeps
+  // every tab mounted (to preserve state across switches) rather than
+  // conditionally rendering them, which means a hidden GameScreen's own
+  // window-level keydown listener would otherwise still fire — typing on
+  // one tab could silently place tiles on another, hidden one. Defaults
+  // to true for callers that don't need tab-switching (there's only ever
+  // one instance in that case).
+  active?: boolean;
 }
 
 export function GameScreen({
@@ -71,6 +85,7 @@ export function GameScreen({
   onPlayAgain,
   adminSolution,
   onAdminComplete,
+  active = true,
 }: GameScreenProps) {
   const [state, dispatch] = useReducer(gameReducer, roundLetters, createInitialState);
   const [activeTileId, setActiveTileId] = useState<string | null>(null);
@@ -126,26 +141,101 @@ export function GameScreen({
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
 
-  // Keyboard-placement shortcut: press a letter key to drop a matching
-  // rack tile at whatever board cell the mouse is currently hovering.
-  // Refs (not state) so the listener is attached once and never goes
-  // stale, rather than re-attaching on every hover/rack change.
-  const hoveredCellRef = useRef<{ r: number; c: number } | null>(null);
+  // The cell the next keyboard action targets — real mouse hover normally,
+  // or an auto-advanced cell right after a keyboard letter placement (see
+  // below). It's React state (not just a ref) because it needs to be
+  // visible: Board highlights whichever cell this points at.
+  const [typingCursor, setTypingCursor] = useState<{ r: number; c: number } | null>(null);
+  const typingCursorRef = useRef(typingCursor);
+  typingCursorRef.current = typingCursor;
+
   const rackRef = useRef(state.rack);
   rackRef.current = state.rack;
+  const boardRef = useRef<BoardModel>(state.board);
+  boardRef.current = state.board;
 
+  const [notReadyMessage, setNotReadyMessage] = useState<string | null>(null);
+  useEffect(() => {
+    if (!notReadyMessage) return;
+    const id = setTimeout(() => setNotReadyMessage(null), 2200);
+    return () => clearTimeout(id);
+  }, [notReadyMessage]);
+
+  function handleCompleteRound() {
+    if (!validation.complete) {
+      setNotReadyMessage(NOT_READY_MESSAGES[Math.floor(Math.random() * NOT_READY_MESSAGES.length)]);
+      return;
+    }
+    onRoundComplete?.(state.round + 1);
+    dispatch({ type: 'ADVANCE_ROUND', liveScore });
+  }
+
+  function handleDeleteTileAt(r: number, c: number) {
+    const tile = boardRef.current[r]?.[c];
+    if (!tile) return;
+    dispatch({ type: 'MOVE_TILE', tileId: tile.id, to: { kind: 'rack' } });
+  }
+
+  // Refs so the keydown effect below can be attached once (empty deps)
+  // while always calling the latest version of these instead of going
+  // stale after the first render.
+  const dispatchRef = useRef(dispatch);
+  dispatchRef.current = dispatch;
+  const handleCompleteRoundRef = useRef(handleCompleteRound);
+  handleCompleteRoundRef.current = handleCompleteRound;
+  const deleteTileAtRef = useRef(handleDeleteTileAt);
+  deleteTileAtRef.current = handleDeleteTileAt;
+  const activeRef = useRef(active);
+  activeRef.current = active;
+
+  // Keyboard shortcuts, attached once via refs/callbacks rather than
+  // depending on state directly, so the listener never goes stale without
+  // needing to be torn down and re-attached on every render.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
+      if (!activeRef.current) return;
       const target = e.target as HTMLElement | null;
       if (target && ['INPUT', 'TEXTAREA'].includes(target.tagName)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleCompleteRoundRef.current();
+        return;
+      }
+
+      if (e.key === 'Backspace') {
+        e.preventDefault();
+        dispatchRef.current({ type: 'UNDO' });
+        return;
+      }
+
+      if (e.key === 'Delete') {
+        const cell = typingCursorRef.current;
+        if (cell) deleteTileAtRef.current(cell.r, cell.c);
+        return;
+      }
+
       const letter = e.key.toUpperCase();
       if (letter.length !== 1 || letter < 'A' || letter > 'Z') return;
-      const cell = hoveredCellRef.current;
+      const cell = typingCursorRef.current;
       if (!cell) return;
       const tile = rackRef.current.find((t) => t.letter === letter);
       if (!tile) return;
-      dispatch({ type: 'MOVE_TILE', tileId: tile.id, to: { kind: 'board', r: cell.r, c: cell.c } });
+
+      dispatchRef.current({ type: 'MOVE_TILE', tileId: tile.id, to: { kind: 'board', r: cell.r, c: cell.c } });
+
+      // Auto-advance so the player can keep typing to spell a word without
+      // touching the mouse. Vertical continuation (down) when there's a
+      // tile directly above and nothing to the left suggesting a
+      // horizontal word instead; otherwise the default is rightward.
+      const board = boardRef.current;
+      const above = cell.r > 0 ? board[cell.r - 1][cell.c] : null;
+      const left = cell.c > 0 ? board[cell.r][cell.c - 1] : null;
+      const vertical = above && !left;
+      const next = vertical ? { r: cell.r + 1, c: cell.c } : { r: cell.r, c: cell.c + 1 };
+      const inBounds = next.r >= 0 && next.r < ROWS && next.c >= 0 && next.c < COLS;
+      setTypingCursor(inBounds ? next : null);
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -191,9 +281,9 @@ export function GameScreen({
         <Board
           board={state.board}
           cellStatus={validation.cellStatus}
-          onHoverCell={(cell) => {
-            hoveredCellRef.current = cell;
-          }}
+          typingCursor={typingCursor}
+          onHoverCell={(cell) => setTypingCursor(cell)}
+          onDeleteTile={(tileId) => dispatch({ type: 'MOVE_TILE', tileId, to: { kind: 'rack' } })}
         />
         <Rack rack={state.rack} />
         <DragOverlay>
@@ -213,11 +303,7 @@ export function GameScreen({
         onShuffle={() => dispatch({ type: 'SHUFFLE_RACK' })}
         onUndo={() => dispatch({ type: 'UNDO' })}
         onRedo={() => dispatch({ type: 'REDO' })}
-        onNext={() => {
-          if (!validation.complete) return;
-          onRoundComplete?.(state.round + 1);
-          dispatch({ type: 'ADVANCE_ROUND', liveScore });
-        }}
+        onNext={handleCompleteRound}
         canUndo={state.history.length > 0}
         canRedo={state.future.length > 0}
         ready={validation.complete}
@@ -225,14 +311,15 @@ export function GameScreen({
       />
 
       <div className="status">
-        {statusMessage(
-          validation.complete,
-          state.rack.length,
-          validation.hasIsolatedTiles,
-          validation.isConnected,
-          validation.allWordsValid,
-          state.round,
-        )}
+        {notReadyMessage ??
+          statusMessage(
+            validation.complete,
+            state.rack.length,
+            validation.hasIsolatedTiles,
+            validation.isConnected,
+            validation.allWordsValid,
+            state.round,
+          )}
       </div>
 
       {adminSolution && !finished && (
