@@ -68,6 +68,11 @@ h1 {
   border-radius: 16px;
   width: 100%;
   transform-origin: 50% 0%;
+  /* Otherwise a real mouse click-drag over empty board space starts a
+     native text/content selection instead of the marquee-select
+     gesture. */
+  user-select: none;
+  -webkit-user-select: none;
 }
 .cell {
   aspect-ratio: 1/1;
@@ -121,7 +126,11 @@ h1 {
   cursor: grabbing;
 }
 .tile.dragging {
-  opacity: 0.4;
+  visibility: hidden;
+}
+.tile.drag-overlay {
+  opacity: 0.85;
+  cursor: grabbing;
 }
 .tile .pts {
   position: absolute;

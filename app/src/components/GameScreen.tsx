@@ -294,7 +294,16 @@ export function GameScreen({
 
   function handleDragStart(event: DragStartEvent) {
     setActiveTileId(event.active.id as string);
-    const rect = event.active.rect.current.initial;
+    // Measured directly from the DOM via the tile's data-tile-id rather
+    // than dnd-kit's own rect.current.initial — with a small activation
+    // distance (needed for the "magnetic" drag feel), onDragStart can
+    // fire before dnd-kit's internal rect measurement finishes, leaving
+    // rect.current.initial null and silently breaking the overlay
+    // (nothing throws, it just never renders). The DOM node is always
+    // there and measurable the moment the drag starts, so query for it
+    // directly instead of relying on dnd-kit's timing.
+    const node = document.querySelector<HTMLElement>(`[data-tile-id="${CSS.escape(String(event.active.id))}"]`);
+    const rect = node?.getBoundingClientRect() ?? event.active.rect.current.initial;
     setActiveTileSize(rect ? { width: rect.width, height: rect.height } : null);
   }
 
@@ -374,7 +383,7 @@ export function GameScreen({
         <DragOverlay>
           {activeTile && activeTileSize ? (
             <div
-              className="tile"
+              className="tile drag-overlay"
               style={{ width: activeTileSize.width, height: activeTileSize.height }}
             >
               {activeTile.letter}

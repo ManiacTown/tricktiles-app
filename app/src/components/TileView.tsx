@@ -23,6 +23,7 @@ export function TileView({ tile, status, onDelete }: TileViewProps) {
     <div
       ref={setNodeRef}
       className={classes.join(' ')}
+      data-tile-id={tile.id}
       {...listeners}
       {...attributes}
       onContextMenu={(e) => {

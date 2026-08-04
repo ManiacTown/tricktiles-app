@@ -37,10 +37,17 @@ function Cell({
       className={classes.join(' ')}
       onPointerEnter={() => onHoverChange?.({ r, c })}
       onPointerLeave={() => onHoverChange?.(null)}
-      onPointerDown={() => {
+      onPointerDown={(e) => {
         // Marquee-select only starts from empty board space — starting on
-        // a tile is left to dnd-kit's own drag handling.
-        if (!tile) onMarqueeStart?.({ r, c });
+        // a tile is left to dnd-kit's own drag handling. preventDefault
+        // stops the browser's native click-and-drag text/content
+        // selection from taking over the gesture instead — without it,
+        // a real mouse drag can silently turn into a text selection and
+        // the marquee never sees the pointer move.
+        if (!tile) {
+          e.preventDefault();
+          onMarqueeStart?.({ r, c });
+        }
       }}
     >
       {tile && <TileView tile={tile} status={status} onDelete={onDeleteTile} />}
