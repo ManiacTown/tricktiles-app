@@ -44,11 +44,15 @@ This is the piece that needs the most design thought, not just code.
 
 ## 3. Backend & data (Supabase)
 
-- [ ] **Schema**: users/profiles, daily_puzzles (date, seed, tile sequence, solution reference), game_sessions (user, puzzle, completion time, score, round-by-round timing), leaderboard views, badges/achievements table, badge_unlocks (user × badge).
-- [ ] **Anti-cheat basics** — client-reported completion time is trivially fakeable. At minimum, validate round transitions server-side (don't trust "I finished in 4 seconds" without server-side timestamps on each round completion event).
-- [ ] **Leaderboard scoping** — daily leaderboard, all-time leaderboard, and maybe friends-only if you want a social loop like Pushdle's Discord community.
-- [ ] **Badge logic** — define trigger conditions (speed thresholds, word-length streaks, perfect rounds, etc.) as a first pass; this can start simple and grow.
-- [ ] **Replay/history** — do players get to see their past boards? Worth deciding early since it affects what you store (just the final board, or every intermediate state).
+- [x] **Schema** — live at project `qpcocrzkccmbhhjpvhsu` (`supabase/migrations/20260804000000_initial_schema.sql`): profiles, daily_puzzles, game_sessions, round_completions, badges, badge_unlocks, plus a `leaderboard` view. Verified against the real project (not just written) — every table/view reachable via REST with the anon key, RLS confirmed working.
+- [x] **Anti-cheat basics** — done to the stated minimum bar: `round_completions.completed_at` is always server `now()`, never client-supplied. The only write path is the `complete_round()` RPC (security-definer, checks session ownership) — verified live, rejecting an unauthorized/fake call exactly as designed. Deeper anti-cheat (validating the actual board content submitted per round, not just accepting a round-complete signal) is a real follow-up, not built.
+- [x] **Leaderboard scoping** — daily leaderboard done via the `leaderboard` view, filterable by `puzzle_id`/date (see `getLeaderboard` in `app/src/supabase/api.ts`). All-time and friends-only are not built — natural extensions of the same view (a `group by user_id` for all-time best; a friends table + join for friends-only) once there's a reason to prioritize them.
+- [ ] **Badge logic** — schema exists (`badges`, `badge_unlocks`), but no trigger conditions are implemented yet — no badges have been defined, and nothing evaluates session data to unlock one. First-pass rules engine still to build.
+- [x] Decided pragmatically (not a section 0 lock): **replay/history** stores just the player's own final board (`game_sessions.final_board_state`), not full intermediate move-by-move state. Revisit if a real replay feature gets prioritized.
+
+**Client wiring**: `app/src/supabase/` has a thin client (`client.ts`, reads `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` from `.env`) and API functions (`getTodayPuzzle`, `getOrCreateSession`, `completeRound`, `getLeaderboard`) — but the game UI (`App.tsx`) doesn't call any of them yet. It still deals its own practice-mode tiles via `Math.random()` (`gameState.ts`), independent of the daily puzzle. Wiring the UI to actually fetch the daily puzzle, require auth, and call `completeRound` per round is unstarted.
+
+**Not yet done**: auth (sign-up/sign-in flow, anonymous vs named play), and no daily puzzle has actually been generated-and-inserted into `daily_puzzles` yet (the Go generator produces one; nothing has pushed its output into this table).
 
 ---
 
