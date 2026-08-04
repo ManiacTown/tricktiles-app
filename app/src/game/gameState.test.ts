@@ -91,6 +91,60 @@ describe('UNDO', () => {
   });
 });
 
+describe('MOVE_GROUP', () => {
+  function stateWithBoardTiles(placements: Array<[number, number, string]>): GameState {
+    let state = stateWithRackTiles(placements.map(([, , letter]) => letter));
+    placements.forEach(([r, c], i) => {
+      state = gameReducer(state, { type: 'MOVE_TILE', tileId: `tile-${i}`, to: { kind: 'board', r, c } });
+    });
+    return state;
+  }
+
+  it('moves every tile in the group by the same offset', () => {
+    const state = stateWithBoardTiles([
+      [2, 2, 'A'],
+      [2, 3, 'B'],
+    ]);
+    const next = gameReducer(state, { type: 'MOVE_GROUP', tileIds: ['tile-0', 'tile-1'], dr: 1, dc: 0 });
+    expect(next.board[2][2]).toBeNull();
+    expect(next.board[2][3]).toBeNull();
+    expect(next.board[3][2]?.letter).toBe('A');
+    expect(next.board[3][3]?.letter).toBe('B');
+  });
+
+  it('allows a shift where a group member moves into a cell another group member is vacating', () => {
+    const state = stateWithBoardTiles([
+      [2, 2, 'A'],
+      [2, 3, 'B'],
+    ]);
+    // Shifting right by 1: tile-0 moves into tile-1's old cell (2,3),
+    // which is fine since tile-1 is moving away in the same shift.
+    const next = gameReducer(state, { type: 'MOVE_GROUP', tileIds: ['tile-0', 'tile-1'], dr: 0, dc: 1 });
+    expect(next.board[2][3]?.letter).toBe('A');
+    expect(next.board[2][4]?.letter).toBe('B');
+  });
+
+  it('rejects the whole move (no-op) if any tile would go out of bounds', () => {
+    const state = stateWithBoardTiles([
+      [0, 2, 'A'],
+      [2, 2, 'B'],
+    ]);
+    const next = gameReducer(state, { type: 'MOVE_GROUP', tileIds: ['tile-0', 'tile-1'], dr: -1, dc: 0 });
+    expect(next).toBe(state);
+  });
+
+  it('rejects the whole move (no-op) if any tile would collide with a tile outside the group', () => {
+    const state = stateWithBoardTiles([
+      [2, 2, 'A'],
+      [2, 3, 'B'],
+      [3, 2, 'C'],
+    ]);
+    // Moving {A, B} down by 1 would put A on top of C, which isn't in the group.
+    const next = gameReducer(state, { type: 'MOVE_GROUP', tileIds: ['tile-0', 'tile-1'], dr: 1, dc: 0 });
+    expect(next).toBe(state);
+  });
+});
+
 describe('ADVANCE_ROUND', () => {
   it('deals the next round tiles into the rack and increments round', () => {
     const state = stateWithRackTiles([]);

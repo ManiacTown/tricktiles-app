@@ -160,6 +160,17 @@ export function GameScreen({
   const boardRef = useRef<BoardModel>(state.board);
   boardRef.current = state.board;
 
+  // Marquee-selected board tiles (see Board.tsx) that drag or arrow keys
+  // move together as a rigid group instead of individually. A selection
+  // of exactly one tile is treated as no selection at all — dragging it
+  // falls back to the normal single-tile path, which supports swapping
+  // onto an occupied cell; MOVE_GROUP deliberately doesn't (it rejects
+  // the whole move instead), since that's the right behavior for a real
+  // multi-tile group but would be a regression for ordinary single drags.
+  const [selectedTileIds, setSelectedTileIds] = useState<Set<string>>(new Set());
+  const selectedTileIdsRef = useRef(selectedTileIds);
+  selectedTileIdsRef.current = selectedTileIds;
+
   const [notReadyMessage, setNotReadyMessage] = useState<string | null>(null);
   useEffect(() => {
     if (!notReadyMessage) return;
@@ -174,6 +185,7 @@ export function GameScreen({
     }
     onRoundComplete?.(state.round + 1);
     dispatch({ type: 'ADVANCE_ROUND', liveScore });
+    setSelectedTileIds(new Set());
   }
 
   function handleDeleteTileAt(r: number, c: number) {
@@ -219,6 +231,24 @@ export function GameScreen({
       if (e.key === 'Delete') {
         const cell = typingCursorRef.current;
         if (cell) deleteTileAtRef.current(cell.r, cell.c);
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        setSelectedTileIds(new Set());
+        return;
+      }
+
+      const ARROW_DELTAS: Record<string, [number, number]> = {
+        ArrowUp: [-1, 0],
+        ArrowDown: [1, 0],
+        ArrowLeft: [0, -1],
+        ArrowRight: [0, 1],
+      };
+      if (e.key in ARROW_DELTAS && selectedTileIdsRef.current.size > 0) {
+        e.preventDefault();
+        const [dr, dc] = ARROW_DELTAS[e.key];
+        dispatchRef.current({ type: 'MOVE_GROUP', tileIds: Array.from(selectedTileIdsRef.current), dr, dc });
         return;
       }
 
@@ -275,12 +305,39 @@ export function GameScreen({
     if (!over) return;
     const tileId = active.id as string;
     const overId = over.id as string;
+
     if (overId === 'rack') {
       dispatch({ type: 'MOVE_TILE', tileId, to: { kind: 'rack' } });
-    } else if (overId.startsWith('cell-')) {
-      const [, r, c] = overId.split('-');
-      dispatch({ type: 'MOVE_TILE', tileId, to: { kind: 'board', r: Number(r), c: Number(c) } });
+      return;
     }
+    if (!overId.startsWith('cell-')) return;
+    const [, rStr, cStr] = overId.split('-');
+    const targetR = Number(rStr);
+    const targetC = Number(cStr);
+
+    const selected = selectedTileIdsRef.current;
+    if (selected.size > 1 && selected.has(tileId)) {
+      const board = boardRef.current;
+      let origin: { r: number; c: number } | null = null;
+      outer: for (let r = 0; r < board.length; r++) {
+        for (let c = 0; c < board[r].length; c++) {
+          if (board[r][c]?.id === tileId) {
+            origin = { r, c };
+            break outer;
+          }
+        }
+      }
+      if (origin) {
+        const dr = targetR - origin.r;
+        const dc = targetC - origin.c;
+        if (dr !== 0 || dc !== 0) {
+          dispatch({ type: 'MOVE_GROUP', tileIds: Array.from(selected), dr, dc });
+        }
+        return;
+      }
+    }
+
+    dispatch({ type: 'MOVE_TILE', tileId, to: { kind: 'board', r: targetR, c: targetC } });
   }
 
   const activeTile = activeTileId ? (allTiles.get(activeTileId) ?? null) : null;
@@ -310,6 +367,8 @@ export function GameScreen({
           typingCursor={typingCursor}
           onHoverCell={(cell) => setTypingCursor(cell)}
           onDeleteTile={(tileId) => dispatch({ type: 'MOVE_TILE', tileId, to: { kind: 'rack' } })}
+          selectedTileIds={selectedTileIds}
+          onSelectionChange={(ids) => setSelectedTileIds(new Set(ids))}
         />
         <Rack rack={state.rack} />
         <DragOverlay>
@@ -363,7 +422,13 @@ export function GameScreen({
             (state.roundCompletedAt[i] - (i === 0 ? state.startTime : state.roundCompletedAt[i - 1])) / 1000,
           ),
         }))}
-        onPlayAgain={onPlayAgain ?? (() => dispatch({ type: 'RESTART' }))}
+        onPlayAgain={
+          onPlayAgain ??
+          (() => {
+            dispatch({ type: 'RESTART' });
+            setSelectedTileIds(new Set());
+          })
+        }
       />
     </>
   );

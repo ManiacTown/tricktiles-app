@@ -39,6 +39,15 @@ export type GameAction =
   | { type: 'ADVANCE_ROUND'; liveScore: number }
   | { type: 'RESTART' }
   | { type: 'UNDO' }
+  // Moves a whole set of board tiles (a marquee selection) by the same
+  // (dr, dc) offset in one shot — used by both group-drag and arrow-key
+  // nudging. If any tile in the group would go out of bounds or land on
+  // a cell occupied by something outside the group, the whole move is
+  // rejected (no-op) rather than partially applied — see gameState.ts's
+  // moveGroup. Tiles moving into cells vacated by other group members are
+  // always fine, since a rigid shift can never make group members
+  // collide with each other.
+  | { type: 'MOVE_GROUP'; tileIds: string[]; dr: number; dc: number }
   // Admin/testing shortcut: jump straight to a finished game with a given
   // (already-solved, already-translated-to-fit-the-board) board and final
   // score, skipping manual play entirely. See GameScreen's admin button.
@@ -124,6 +133,34 @@ function moveTile(state: GameState, action: Extract<GameAction, { type: 'MOVE_TI
   return { ...state, ...pushHistory(state), board, rack };
 }
 
+function moveGroup(state: GameState, tileIds: string[], dr: number, dc: number): GameState {
+  const idSet = new Set(tileIds);
+  const rows = state.board.length;
+  const cols = state.board[0]?.length ?? 0;
+
+  const positions = new Map<string, { r: number; c: number; tile: Tile }>();
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const tile = state.board[r][c];
+      if (tile && idSet.has(tile.id)) positions.set(tile.id, { r, c, tile });
+    }
+  }
+
+  for (const pos of positions.values()) {
+    const nr = pos.r + dr;
+    const nc = pos.c + dc;
+    if (nr < 0 || nr >= rows || nc < 0 || nc >= cols) return state;
+    const occupant = state.board[nr][nc];
+    if (occupant && !idSet.has(occupant.id)) return state;
+  }
+
+  const board = state.board.map((row) => [...row]);
+  for (const pos of positions.values()) board[pos.r][pos.c] = null;
+  for (const pos of positions.values()) board[pos.r + dr][pos.c + dc] = pos.tile;
+
+  return { ...state, ...pushHistory(state), board };
+}
+
 function shuffleRack(state: GameState): GameState {
   const rack = [...state.rack];
   for (let i = rack.length - 1; i > 0; i--) {
@@ -185,6 +222,8 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return createInitialState(state.roundLetters);
     case 'UNDO':
       return undo(state);
+    case 'MOVE_GROUP':
+      return moveGroup(state, action.tileIds, action.dr, action.dc);
     case 'ADMIN_COMPLETE':
       return adminComplete(state, action.board, action.score);
     default:
