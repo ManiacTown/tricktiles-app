@@ -195,6 +195,22 @@ export function GameScreen({
     return () => clearTimeout(id);
   }, [state]);
 
+  // Fires immediately (not debounced) the instant the round finishes,
+  // racing ahead of the round-complete RPC (DailyChallenge's
+  // onRoundComplete) that flips the session to 'completed' server-side —
+  // once that happens, RLS silently no-ops any further save, so waiting
+  // out the full 1s debounce above risked losing that race and leaving
+  // final_board_state stuck on a stale, not-yet-finished snapshot (which
+  // made the game look "unfinished," timer and all, on the next reload).
+  // Doesn't fully guarantee the ordering, but narrows the window from "the
+  // whole debounce" to "however long this one request takes." Deliberately
+  // keyed on `finished` alone (not `state`) — only meant to fire once, on
+  // the transition into the finished state.
+  useEffect(() => {
+    if (finished) onSaveStateRef.current?.(toPersistedState(state));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [finished]);
+
   const validation = useMemo(
     () => validateBoard(state.board, state.rack.length === 0),
     [state.board, state.rack.length],
@@ -484,16 +500,23 @@ export function GameScreen({
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <Board
-          board={state.board}
-          cellStatus={validation.cellStatus}
-          typingCursor={typingCursor}
-          onHoverCell={(cell) => setTypingCursor(cell)}
-          onDeleteTile={(tileId) => dispatch({ type: 'MOVE_TILE', tileId, to: { kind: 'rack' } })}
-          selectedTileIds={selectedTileIds}
-          onSelectionChange={(ids) => setSelectedTileIds(new Set(ids))}
-        />
-        <Rack rack={manuallyPaused ? [] : state.rack} />
+        {/* Blurred (not hidden) while manually paused — the letters read as
+            indistinct blobs instead of vanishing outright, which reads
+            better with the Paused card's own fade/pop-in transition than a
+            hard cut to an empty rack did. pointer-events:none is a second
+            line of defense alongside handleDragStart's own paused check. */}
+        <div className={`playfield${manuallyPaused ? ' playfield-blurred' : ''}`}>
+          <Board
+            board={state.board}
+            cellStatus={validation.cellStatus}
+            typingCursor={typingCursor}
+            onHoverCell={(cell) => setTypingCursor(cell)}
+            onDeleteTile={(tileId) => dispatch({ type: 'MOVE_TILE', tileId, to: { kind: 'rack' } })}
+            selectedTileIds={selectedTileIds}
+            onSelectionChange={(ids) => setSelectedTileIds(new Set(ids))}
+          />
+          <Rack rack={state.rack} />
+        </div>
         <DragOverlay>
           {activeTile && activeTileSize ? (
             <div

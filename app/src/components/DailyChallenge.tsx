@@ -53,12 +53,21 @@ export function DailyChallenge({ active = true }: DailyChallengeProps) {
     return <div className="status">Loading today's puzzle...</div>;
   }
 
-  // Sessions completed before auto-save existed (or that lost the race
-  // between the last checkpoint and complete_round() flipping status, since
-  // RLS silently no-ops saves once a session is no longer in_progress) have
-  // no board to resume or replay — there's nothing useful for GameScreen to
-  // render in that case, so show a plain message instead of a blank board.
-  if (gameSession.status === 'completed' && !gameSession.final_board_state) {
+  const rawSavedState = (gameSession.final_board_state as PersistedGameState | null) ?? undefined;
+
+  // Sessions completed before auto-save existed, or that lost the race
+  // between the last checkpoint and complete_round() flipping status (RLS
+  // silently no-ops saves once a session is no longer in_progress), have
+  // no board — or worse, a *stale* one whose endTime is still null because
+  // it was captured a moment before the round actually finished. Passing
+  // that stale snapshot to GameScreen as "resumable" would hydrate a
+  // technically-completed session back into a live, timer-ticking board
+  // (the round/session status is 'completed' server-side, but the client
+  // would render as if it weren't) — so gameSession.status, not whatever
+  // final_board_state happens to contain, is what decides "is this really
+  // still playable." Anything completed without a properly-finished
+  // snapshot falls back to a plain message instead of a broken resume.
+  if (gameSession.status === 'completed' && rawSavedState?.endTime == null) {
     return (
       <div className="status" style={{ marginTop: '40px' }}>
         You've already completed today's puzzle! Come back tomorrow for a new one.
@@ -67,7 +76,7 @@ export function DailyChallenge({ active = true }: DailyChallengeProps) {
   }
 
   const roundLetters = [...puzzle.rounds].sort((a, b) => a.round - b.round).map((r) => r.letters);
-  const savedState = (gameSession.final_board_state as PersistedGameState | null) ?? undefined;
+  const savedState = rawSavedState;
 
   return (
     <GameScreen

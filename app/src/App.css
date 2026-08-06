@@ -64,6 +64,28 @@ h1 {
   padding: 0;
 }
 
+/* Wraps the board + rack so pausing can blur both together in one filter
+   (rather than the board and rack separately drifting out of sync) while
+   the Hud/Controls/status text around it stay sharp and readable. Mirrors
+   .tab-panel's own centering since it now sits between .tab-panel and
+   .board-zoom-wrap/#rackWrap in the DOM. */
+.playfield {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  transition: filter 0.3s ease;
+}
+.playfield-blurred {
+  filter: blur(10px);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .playfield {
+    transition: none;
+  }
+}
+
 .board-zoom-wrap {
   width: 100%;
   max-width: 660px;
