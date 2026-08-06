@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './client';
 import type { ProfileRow } from './types';
@@ -8,6 +8,15 @@ interface AuthState {
   session: Session | null;
   profile: ProfileRow | null;
 }
+
+interface AuthContextValue extends AuthState {
+  signUp: (email: string, password: string, username: string) => Promise<{ needsEmailConfirmation: boolean }>;
+  signIn: (email: string, password: string) => Promise<void>;
+  signOut: () => Promise<void>;
+  updateSelectedEmoji: (emoji: string | null) => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextValue | null>(null);
 
 async function fetchProfile(userId: string): Promise<ProfileRow | null> {
   const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
@@ -28,8 +37,16 @@ async function ensureProfile(userId: string, username: string): Promise<ProfileR
 }
 
 // Tracks the current Supabase auth session and, once signed in, the
-// player's profile row (username).
-export function useAuth() {
+// player's profile row (username, flair) — a real Context (not a plain
+// per-call hook) is what it takes here, not just style: App.tsx keeps
+// every tab (Daily/Practice/Profile/Badges/Leaderboard) mounted
+// simultaneously, each reading auth state. A per-call hook would give
+// each of those its own independent copy fetched once at mount, with no
+// way to learn about a later change — e.g. Badges.tsx setting flair would
+// update only Badges' own copy, leaving Profile.tsx still showing no
+// flair until a full remount. One Provider higher up the tree means one
+// shared state instance every consumer sees the same live updates to.
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({ loading: true, session: null, profile: null });
 
   useEffect(() => {
@@ -98,5 +115,29 @@ export function useAuth() {
     await supabase.auth.signOut();
   }
 
-  return { ...state, signUp, signIn, signOut };
+  // `emoji` null clears flair. The check constraint on profiles.selected_emoji
+  // enforces "is this a real rare+ badge's icon at all" — it does NOT check
+  // that this specific player actually earned that badge (same tradeoff
+  // Pushdle makes, see the migration's own comment); that gating is the
+  // caller's job (Badges.tsx only offers this for badges in earnedIds).
+  // Updates shared state directly on success rather than refetching, so
+  // every consumer's flair display updates immediately.
+  async function updateSelectedEmoji(emoji: string | null): Promise<void> {
+    if (!state.session) return;
+    const { error } = await supabase.from('profiles').update({ selected_emoji: emoji }).eq('id', state.session.user.id);
+    if (error) throw error;
+    setState((prev) => (prev.profile ? { ...prev, profile: { ...prev.profile, selected_emoji: emoji } } : prev));
+  }
+
+  return (
+    <AuthContext.Provider value={{ ...state, signUp, signIn, signOut, updateSelectedEmoji }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth(): AuthContextValue {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within an AuthProvider');
+  return ctx;
 }

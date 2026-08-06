@@ -4,14 +4,16 @@ import { GameScreen } from './components/GameScreen';
 import { DailyChallenge } from './components/DailyChallenge';
 import { Profile } from './components/Profile';
 import { Badges } from './components/Badges';
+import { Leaderboard } from './components/Leaderboard';
 
-type Mode = 'daily' | 'practice' | 'profile' | 'badges';
+type Mode = 'daily' | 'practice' | 'profile' | 'badges' | 'leaderboard';
 
 const TABS: Array<{ mode: Mode; label: string }> = [
   { mode: 'daily', label: 'Daily Challenge' },
   { mode: 'practice', label: 'Practice' },
   { mode: 'profile', label: 'Profile' },
   { mode: 'badges', label: 'Badges' },
+  { mode: 'leaderboard', label: 'Leaderboard' },
 ];
 
 function App() {
@@ -38,7 +40,7 @@ function App() {
         ))}
       </div>
 
-      {/* All three tabs stay mounted and are only hidden via CSS, rather
+      {/* Every tab stays mounted and is only hidden via CSS, rather
           than conditionally rendered — switching tabs would otherwise
           unmount/remount each one, losing the in-progress board, fetched
           daily puzzle, etc. every time. Each panel centers its own
@@ -57,6 +59,9 @@ function App() {
       </div>
       <div className={`tab-panel${mode === 'badges' ? '' : ' tab-panel-hidden'}`}>
         <Badges />
+      </div>
+      <div className={`tab-panel${mode === 'leaderboard' ? '' : ' tab-panel-hidden'}`}>
+        <Leaderboard />
       </div>
     </>
   );

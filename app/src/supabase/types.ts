@@ -26,7 +26,13 @@ export interface ProfileRow {
   id: string;
   username: string;
   created_at: string;
+  // Rare-or-better badge emoji the player has equipped as flair — null
+  // means none selected. Allowed values are DB-enforced (a check
+  // constraint listing every rare+ badge's icon), not just client-side.
+  selected_emoji: string | null;
 }
+
+export type BadgeRarity = 'common' | 'rare' | 'legendary' | 'special';
 
 export interface BadgeRow {
   id: string;
@@ -34,6 +40,8 @@ export interface BadgeRow {
   name: string;
   description: string;
   icon: string | null;
+  category: string;
+  rarity: BadgeRarity;
 }
 
 export interface BadgeUnlockRow {
@@ -54,4 +62,5 @@ export interface LeaderboardRow {
   finished_at: string;
   elapsed_seconds: number;
   client_score: number | null;
+  selected_emoji: string | null;
 }

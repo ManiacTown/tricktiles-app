@@ -665,6 +665,7 @@ button:disabled {
   gap: 10px;
 }
 .badge-card {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -676,8 +677,38 @@ button:disabled {
 }
 .badge-card-earned {
   opacity: 1;
-  border-color: var(--accent);
+  border-color: var(--rarity-color, var(--accent));
   background: var(--accent-soft);
+}
+/* Flair-eligible earned badges (rare+) are clickable — cursor + a subtle
+   lift on hover signals that, matching Pushdle's own clickable-badge-card
+   affordance. */
+.badge-card[role='button'] {
+  cursor: pointer;
+  transition:
+    transform 0.1s,
+    box-shadow 0.15s;
+}
+.badge-card[role='button']:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+.badge-card-selected {
+  border-width: 2px;
+  box-shadow: 0 0 0 2px var(--rarity-color, var(--accent));
+}
+.badge-rarity-pill {
+  position: absolute;
+  top: -8px;
+  right: 10px;
+  background: var(--surface);
+  border: 1px solid;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
 }
 .badge-icon {
   font-size: 22px;
@@ -692,9 +723,104 @@ button:disabled {
   font-size: 13px;
   font-weight: 700;
   color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.badge-flair-tag {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 1px 6px;
 }
 .badge-description {
   font-size: 11px;
   color: var(--ink-soft);
   margin-top: 2px;
+}
+
+/* Leaderboard — same "you" highlighting + rank-tier coloring precedence as
+   Pushdle's own leaderboard rows: gold/silver/bronze for the top 3 wins
+   over the "is this me" tint if both apply (matches nth-of-type ordering
+   losing to an explicit rank class there too). */
+.leaderboard-you-banner {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 14px;
+}
+.leaderboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.leaderboard-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--board-bg);
+  font-size: 13px;
+  transition:
+    transform 0.15s,
+    filter 0.15s;
+}
+.leaderboard-row-me {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.leaderboard-row-gold {
+  border-color: #d4a017;
+  background: rgba(212, 160, 23, 0.12);
+}
+.leaderboard-row-silver {
+  border-color: #9aa1ab;
+  background: rgba(154, 161, 171, 0.12);
+}
+.leaderboard-row-bronze {
+  border-color: #b5651d;
+  background: rgba(181, 101, 29, 0.12);
+}
+.leaderboard-rank {
+  width: 28px;
+  flex-shrink: 0;
+  text-align: center;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.leaderboard-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--ink);
+}
+.leaderboard-flair {
+  flex-shrink: 0;
+}
+.leaderboard-you-tag {
+  flex-shrink: 0;
+  font-size: 8px;
+  font-weight: 700;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 1px 6px;
+}
+.leaderboard-time {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }

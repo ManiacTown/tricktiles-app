@@ -49,9 +49,12 @@ export function Profile() {
     <>
       <div className="profile-header">
         <div>
-          <h2 className="stamp" style={{ margin: 0 }}>
-            {profile.username}
-          </h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <h2 className="stamp" style={{ margin: 0 }}>
+              {profile.username}
+            </h2>
+            {profile.selected_emoji && <span style={{ fontSize: '20px' }}>{profile.selected_emoji}</span>}
+          </div>
           <div className="subtitle" style={{ marginTop: '4px' }}>
             Daily Challenge Stats
           </div>
