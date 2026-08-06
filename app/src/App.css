@@ -53,6 +53,16 @@ h1 {
   color: var(--ink);
   margin-top: 2px;
 }
+.hud-pause-btn {
+  flex: 0 0 auto;
+  width: 44px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--ink);
+  font-size: 16px;
+  border-radius: 10px;
+  padding: 0;
+}
 
 .board-zoom-wrap {
   width: 100%;
@@ -303,7 +313,10 @@ button:disabled {
   color: var(--ink-soft);
 }
 
-#overlay {
+/* Shared full-screen backdrop for both the win/result overlay and the
+   pause overlay below — same dimming + fade-in, just different card
+   content inside. */
+.modal-backdrop {
   position: fixed;
   inset: 0;
   background: rgba(30, 28, 24, 0.55);
@@ -313,7 +326,7 @@ button:disabled {
   z-index: 10;
   padding: 20px;
 }
-#overlay.show {
+.modal-backdrop.show {
   display: flex;
   animation: overlayFadeIn 0.2s ease;
 }
@@ -437,6 +450,32 @@ button:disabled {
 .result-exit {
   margin-top: 12px;
   width: 100%;
+}
+
+.pause-card {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 40px 36px;
+  text-align: center;
+  min-width: 280px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25);
+  animation: resultPopIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pause-card {
+    animation: none;
+  }
+}
+.pause-card h2 {
+  margin: 0 0 20px;
+  font-size: 22px;
+}
+.pause-card button {
+  background: var(--accent);
+  color: #ffffff;
+  padding: 12px 32px;
 }
 
 .card {

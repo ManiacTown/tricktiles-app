@@ -14,6 +14,7 @@ import { Rack } from './Rack';
 import { Hud } from './Hud';
 import { Controls } from './Controls';
 import { Overlay } from './Overlay';
+import { PauseOverlay } from './PauseOverlay';
 import { createInitialState, gameReducer, hydrateState, toPersistedState } from '../game/gameState';
 import type { PersistedGameState } from '../game/gameState';
 import { LETTER_VALUES } from '../game/letterBag';
@@ -130,13 +131,58 @@ export function GameScreen({
   // again instead of staying permanently dismissed.
   const [overlayDismissed, setOverlayDismissed] = useState(false);
 
+  // Tab-visibility auto-pause: stops the on-screen timer while the browser
+  // tab is backgrounded, and while this GameScreen's own app-tab isn't the
+  // visible one — App.tsx keeps Daily/Practice mounted simultaneously via
+  // `active`, so without the `!active` check here, playing Practice for 10
+  // minutes and switching back to Daily would silently add those 10
+  // minutes to Daily's timer. Deliberately invisible/seamless (no modal) —
+  // unlike manuallyPaused below, there's no one to see a modal on a
+  // backgrounded or hidden tab anyway.
+  const [tabHidden, setTabHidden] = useState(() => document.visibilityState === 'hidden');
   useEffect(() => {
-    if (finished) return;
+    function onVisibilityChange() {
+      setTabHidden(document.visibilityState === 'hidden');
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+  }, []);
+
+  // The explicit Pause button (see Hud) — shows the Paused modal, covers
+  // the board, and hides the rack (see the Rack render below).
+  const [manuallyPaused, setManuallyPaused] = useState(false);
+  // `!finished &&` guards against tabHidden toggling after a win and
+  // retroactively shrinking the already-locked final time via pausedMs
+  // below — once the round is over there's nothing left to pause.
+  const paused = !finished && (manuallyPaused || tabHidden || !active);
+
+  // Total time spent paused so far, subtracted out of elapsedSeconds below
+  // so the displayed/final time reflects active play time only. A ref
+  // (pauseStartRef), not state, tracks the *current* pause segment's start
+  // — only the completed total needs to trigger a re-render.
+  const [pausedMs, setPausedMs] = useState(0);
+  const pauseStartRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (paused) {
+      pauseStartRef.current = Date.now();
+    } else if (pauseStartRef.current !== null) {
+      const start = pauseStartRef.current;
+      pauseStartRef.current = null;
+      setPausedMs((prev) => prev + (Date.now() - start));
+    }
+  }, [paused]);
+
+  useEffect(() => {
+    if (finished || paused) return;
     const id = setInterval(() => forceTick((t) => t + 1), 1000);
     return () => clearInterval(id);
-  }, [finished]);
+  }, [finished, paused]);
 
-  const elapsedSeconds = Math.floor(((state.endTime ?? Date.now()) - state.startTime) / 1000);
+  // Clamped to the moment the current pause segment began, if paused —
+  // otherwise a render that happens to fire mid-pause (e.g. from some
+  // unrelated state change) would keep advancing the displayed time.
+  const nowForElapsed = paused && pauseStartRef.current !== null ? pauseStartRef.current : Date.now();
+  const elapsedSeconds = Math.floor(((state.endTime ?? nowForElapsed) - state.startTime - pausedMs) / 1000);
 
   // Debounced auto-save checkpoint: fires ~1s after board/rack/round
   // settles, rather than on every single tile move. onSaveState is a ref
@@ -245,13 +291,15 @@ export function GameScreen({
   deleteTileAtRef.current = handleDeleteTileAt;
   const activeRef = useRef(active);
   activeRef.current = active;
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
 
   // Keyboard shortcuts, attached once via refs/callbacks rather than
   // depending on state directly, so the listener never goes stale without
   // needing to be torn down and re-attached on every render.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (!activeRef.current) return;
+      if (!activeRef.current || pausedRef.current) return;
       const target = e.target as HTMLElement | null;
       if (target && ['INPUT', 'TEXTAREA'].includes(target.tagName)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -333,6 +381,10 @@ export function GameScreen({
   }, []);
 
   function handleDragStart(event: DragStartEvent) {
+    // Belt-and-suspenders — the pause modal's backdrop already blocks
+    // pointer events from reaching the board, but this covers any edge
+    // case (e.g. a drag that started just before pausing).
+    if (paused) return;
     setActiveTileId(event.active.id as string);
     // Measured directly from the DOM via the tile's data-tile-id rather
     // than dnd-kit's own rect.current.initial — with a small activation
@@ -411,12 +463,20 @@ export function GameScreen({
       dispatch({ type: 'RESTART' });
       setSelectedTileIds(new Set());
       setOverlayDismissed(false);
+      setPausedMs(0);
+      setManuallyPaused(false);
     }
   }
 
   return (
     <>
-      <Hud round={state.round} elapsedSeconds={elapsedSeconds} score={displayScore} />
+      <Hud
+        round={state.round}
+        elapsedSeconds={elapsedSeconds}
+        score={displayScore}
+        onPause={() => setManuallyPaused(true)}
+        pauseDisabled={finished}
+      />
 
       <DndContext
         sensors={sensors}
@@ -433,7 +493,7 @@ export function GameScreen({
           selectedTileIds={selectedTileIds}
           onSelectionChange={(ids) => setSelectedTileIds(new Set(ids))}
         />
-        <Rack rack={state.rack} />
+        <Rack rack={manuallyPaused ? [] : state.rack} />
         <DragOverlay>
           {activeTile && activeTileSize ? (
             <div
@@ -454,21 +514,23 @@ export function GameScreen({
         canUndo={state.history.length > 0}
         ready={validation.complete}
         isLastRound={isLastRound}
-        disabled={finished}
+        disabled={finished || paused}
       />
 
       <div className="status">
         {finished
           ? '🎉 Solved!'
-          : (notReadyMessage ??
-            statusMessage(
-              validation.complete,
-              state.rack.length,
-              validation.hasIsolatedTiles,
-              validation.isConnected,
-              validation.allWordsValid,
-              state.round,
-            ))}
+          : paused
+            ? 'Paused'
+            : (notReadyMessage ??
+              statusMessage(
+                validation.complete,
+                state.rack.length,
+                validation.hasIsolatedTiles,
+                validation.isConnected,
+                validation.allWordsValid,
+                state.round,
+              ))}
       </div>
 
       {finished && overlayDismissed && (
@@ -497,6 +559,8 @@ export function GameScreen({
         puzzleNumber={puzzleNumber}
         onExit={handleExit}
       />
+
+      <PauseOverlay show={manuallyPaused} onResume={() => setManuallyPaused(false)} />
     </>
   );
 }

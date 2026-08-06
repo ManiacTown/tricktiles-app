@@ -71,7 +71,7 @@ export function Overlay({ show, finalTime, finalScore, rounds, puzzleNumber, onE
   return (
     <div
       id="overlay"
-      className={show ? 'show' : undefined}
+      className={`modal-backdrop${show ? ' show' : ''}`}
       // Only dismiss on a click that lands on the backdrop itself — one
       // that bubbles up from inside the card (e.g. a button) shouldn't
       // close it.
