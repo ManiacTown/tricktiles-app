@@ -1,0 +1,33 @@
+name: Publish Daily Puzzle
+
+# Generates and publishes each day's Tricktiles puzzle into Supabase's
+# daily_puzzles table. Runs shortly after UTC midnight, matching the
+# "daily = UTC calendar date" decision baked into both the client
+# (app/src/supabase/api.ts's todayUTC) and the generator
+# (solver/generate/generate.go's seedFromDate) — see the build plan's
+# section 2 timezone note.
+#
+# workflow_dispatch is included so a missed day (e.g. this workflow
+# failing, or a date that never got generated) can be caught up on by
+# manually running it — the publish command already handles "row already
+# exists for today" being a real possibility.
+
+on:
+  schedule:
+    - cron: '5 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.5'
+      - name: Publish today's puzzle
+        working-directory: solver
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: go run ./cmd/publish
