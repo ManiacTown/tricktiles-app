@@ -73,6 +73,22 @@ export async function saveSessionState(sessionId: string, state: PersistedGameSt
   if (error) throw error;
 }
 
+// Fallback for a completed session with no proper final_board_state (see
+// DailyChallenge's "already completed" message) — even without the
+// player's actual board, the server-timestamped round_completions this is
+// derived from (same source the leaderboard itself uses) still knows how
+// long they actually took, so the fallback can show that instead of
+// nothing at all.
+export async function getSessionElapsedSeconds(sessionId: string): Promise<number | null> {
+  const { data, error } = await supabase
+    .from('leaderboard')
+    .select('elapsed_seconds')
+    .eq('session_id', sessionId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as { elapsed_seconds: number } | null)?.elapsed_seconds ?? null;
+}
+
 export async function getLeaderboard(puzzleId: string, limit = 50): Promise<LeaderboardRow[]> {
   const { data, error } = await supabase
     .from('leaderboard')

@@ -15,7 +15,7 @@ import { Hud } from './Hud';
 import { Controls } from './Controls';
 import { Overlay } from './Overlay';
 import { PauseOverlay } from './PauseOverlay';
-import { createInitialState, gameReducer, hydrateState, toPersistedState } from '../game/gameState';
+import { advanceRound, createInitialState, gameReducer, hydrateState, toPersistedState } from '../game/gameState';
 import type { PersistedGameState } from '../game/gameState';
 import { LETTER_VALUES } from '../game/letterBag';
 import { COLS, ROUNDS, ROWS } from '../game/rounds';
@@ -69,8 +69,11 @@ interface GameScreenProps {
   savedState?: PersistedGameState;
   // Debounced checkpoint callback, fired a moment after any board/rack/round
   // change so a closed tab loses at most a few seconds of progress. Omitted
-  // in practice mode, which has nowhere to persist to.
-  onSaveState?: (state: PersistedGameState) => void;
+  // in practice mode, which has nowhere to persist to. May return a promise
+  // — handleCompleteRound awaits it for the final round specifically, to
+  // guarantee that save actually lands before onRoundComplete's RPC flips
+  // the session to 'completed' (see that function's comment).
+  onSaveState?: (state: PersistedGameState) => void | Promise<void>;
   // Called with the 1-indexed round number right as it's completed —
   // daily mode uses this to record the completion server-side.
   onRoundComplete?: (round: number) => void;
@@ -280,12 +283,32 @@ export function GameScreen({
     return () => clearTimeout(id);
   }, [notReadyMessage]);
 
-  function handleCompleteRound() {
+  async function handleCompleteRound() {
     if (!validation.complete) {
       setNotReadyMessage(NOT_READY_MESSAGES[Math.floor(Math.random() * NOT_READY_MESSAGES.length)]);
       return;
     }
-    onRoundComplete?.(state.round + 1);
+    const nextRound = state.round + 1;
+    const willFinish = nextRound >= ROUNDS;
+
+    if (willFinish) {
+      // Save the truly-finished state BEFORE telling the server this
+      // (last) round is complete — previously onRoundComplete fired
+      // first, giving its RPC (which flips the session to 'completed'
+      // server-side) a head start over any save, since the save only ever
+      // happened in a later render's effect. Once that RPC lands, RLS
+      // silently blocks any further save, so losing this race left
+      // final_board_state stuck without a finished snapshot — the exact
+      // bug that made a freshly-completed puzzle look wiped out and
+      // "unfinished" on the next visit. advanceRound is the same pure
+      // function the reducer itself uses; calling it here just to compute
+      // what the saved snapshot should be (rather than waiting for the
+      // dispatch below to take effect on the next render) means its own
+      // Date.now() runs a few ms apart from the dispatch's — harmless,
+      // since this endTime is only ever used for display, never scoring.
+      await onSaveStateRef.current?.(toPersistedState(advanceRound(state, liveScore)));
+    }
+    onRoundComplete?.(nextRound);
     dispatch({ type: 'ADVANCE_ROUND', liveScore });
     setSelectedTileIds(new Set());
   }

@@ -193,7 +193,12 @@ function shuffleRack(state: GameState): GameState {
   return { ...state, rack };
 }
 
-function advanceRound(state: GameState, liveScore: number): GameState {
+// Exported (not just used internally by the reducer below) so
+// GameScreen's handleCompleteRound can compute what the post-advance
+// state WILL be — specifically its endTime — in order to save it before
+// notifying the server the round is complete, rather than after. See that
+// function's own comment for why the ordering matters.
+export function advanceRound(state: GameState, liveScore: number): GameState {
   const previouslyLocked = state.roundScores.reduce((a, b) => a + b, 0);
   const roundScores = [...state.roundScores, liveScore - previouslyLocked];
   const roundCompletedAt = [...state.roundCompletedAt, Date.now()];

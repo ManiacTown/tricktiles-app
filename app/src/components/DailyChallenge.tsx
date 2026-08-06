@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../supabase/useAuth';
-import { getTodayPuzzle, getOrCreateSession, completeRound, saveSessionState } from '../supabase/api';
+import { getTodayPuzzle, getOrCreateSession, completeRound, saveSessionState, getSessionElapsedSeconds } from '../supabase/api';
 import { ROUNDS } from '../game/rounds';
 import type { PersistedGameState } from '../game/gameState';
 import type { DailyPuzzleRow, GameSessionRow } from '../supabase/types';
@@ -11,11 +11,23 @@ interface DailyChallengeProps {
   active?: boolean;
 }
 
+function formatTime(totalSeconds: number): string {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
 export function DailyChallenge({ active = true }: DailyChallengeProps) {
   const { loading: authLoading, session, profile, signUp, signIn } = useAuth();
   const [puzzle, setPuzzle] = useState<DailyPuzzleRow | null>(null);
   const [gameSession, setGameSession] = useState<GameSessionRow | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Populated only in the no-proper-snapshot fallback below — we don't
+  // have the player's actual board there, but the server-timestamped
+  // round_completions it's derived from (see getSessionElapsedSeconds)
+  // still knows how long they took, which beats a bare "come back
+  // tomorrow" with nothing to show for the finish at all.
+  const [fallbackElapsed, setFallbackElapsed] = useState<number | null>(null);
 
   useEffect(() => {
     if (!session || !profile) return;
@@ -37,6 +49,35 @@ export function DailyChallenge({ active = true }: DailyChallengeProps) {
     };
   }, [session, profile]);
 
+  const rawSavedState = (gameSession?.final_board_state as PersistedGameState | null) ?? undefined;
+
+  // Sessions completed before auto-save existed, or that lost the race
+  // between the last checkpoint and complete_round() flipping status (RLS
+  // silently no-ops saves once a session is no longer in_progress), have
+  // no board — or worse, a *stale* one whose endTime is still null because
+  // it was captured a moment before the round actually finished. Passing
+  // that stale snapshot to GameScreen as "resumable" would hydrate a
+  // technically-completed session back into a live, timer-ticking board
+  // (the round/session status is 'completed' server-side, but the client
+  // would render as if it weren't) — so gameSession.status, not whatever
+  // final_board_state happens to contain, is what decides "is this really
+  // still playable." Anything completed without a properly-finished
+  // snapshot falls back to a plain message instead of a broken resume.
+  const needsFallback = gameSession?.status === 'completed' && rawSavedState?.endTime == null;
+
+  useEffect(() => {
+    if (!needsFallback || !gameSession) return;
+    let cancelled = false;
+    getSessionElapsedSeconds(gameSession.id)
+      .then((seconds) => {
+        if (!cancelled) setFallbackElapsed(seconds);
+      })
+      .catch((err) => console.error('Failed to fetch fallback elapsed time:', err));
+    return () => {
+      cancelled = true;
+    };
+  }, [needsFallback, gameSession]);
+
   if (authLoading) {
     return <div className="status">Loading...</div>;
   }
@@ -53,24 +94,11 @@ export function DailyChallenge({ active = true }: DailyChallengeProps) {
     return <div className="status">Loading today's puzzle...</div>;
   }
 
-  const rawSavedState = (gameSession.final_board_state as PersistedGameState | null) ?? undefined;
-
-  // Sessions completed before auto-save existed, or that lost the race
-  // between the last checkpoint and complete_round() flipping status (RLS
-  // silently no-ops saves once a session is no longer in_progress), have
-  // no board — or worse, a *stale* one whose endTime is still null because
-  // it was captured a moment before the round actually finished. Passing
-  // that stale snapshot to GameScreen as "resumable" would hydrate a
-  // technically-completed session back into a live, timer-ticking board
-  // (the round/session status is 'completed' server-side, but the client
-  // would render as if it weren't) — so gameSession.status, not whatever
-  // final_board_state happens to contain, is what decides "is this really
-  // still playable." Anything completed without a properly-finished
-  // snapshot falls back to a plain message instead of a broken resume.
-  if (gameSession.status === 'completed' && rawSavedState?.endTime == null) {
+  if (needsFallback) {
     return (
       <div className="status" style={{ marginTop: '40px' }}>
-        You've already completed today's puzzle! Come back tomorrow for a new one.
+        You've already completed today's puzzle
+        {fallbackElapsed != null ? ` in ${formatTime(fallbackElapsed)}` : ''}! Come back tomorrow for a new one.
       </div>
     );
   }
@@ -87,11 +115,15 @@ export function DailyChallenge({ active = true }: DailyChallengeProps) {
       // Placeholder — daily_puzzles has no sequential puzzle number yet
       // (just a date). Swap for the real count once that's added.
       puzzleNumber={122}
-      onSaveState={(state) => {
+      // Returns the promise (rather than firing-and-forgetting it) so
+      // GameScreen's handleCompleteRound can await the final round's save
+      // and guarantee it lands before onRoundComplete's RPC below flips
+      // the session to 'completed' — see that function's own comment.
+      onSaveState={(state) =>
         saveSessionState(gameSession.id, state).catch((err) => {
           console.error('Failed to save session state:', err);
-        });
-      }}
+        })
+      }
       onRoundComplete={(round) => {
         completeRound(gameSession.id, round).catch((err) => {
           console.error('Failed to record round completion:', err);
