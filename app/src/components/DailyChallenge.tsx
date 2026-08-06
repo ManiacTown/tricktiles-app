@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../supabase/useAuth';
-import { getTodayPuzzle, getOrCreateSession, completeRound } from '../supabase/api';
+import { getTodayPuzzle, getOrCreateSession, completeRound, saveSessionState } from '../supabase/api';
 import { ROUNDS } from '../game/rounds';
+import type { PersistedGameState } from '../game/gameState';
 import type { DailyPuzzleRow, GameSessionRow } from '../supabase/types';
 import { SignIn } from './SignIn';
 import { GameScreen } from './GameScreen';
@@ -52,13 +53,33 @@ export function DailyChallenge({ active = true }: DailyChallengeProps) {
     return <div className="status">Loading today's puzzle...</div>;
   }
 
+  // Sessions completed before auto-save existed (or that lost the race
+  // between the last checkpoint and complete_round() flipping status, since
+  // RLS silently no-ops saves once a session is no longer in_progress) have
+  // no board to resume or replay — there's nothing useful for GameScreen to
+  // render in that case, so show a plain message instead of a blank board.
+  if (gameSession.status === 'completed' && !gameSession.final_board_state) {
+    return (
+      <div className="status" style={{ marginTop: '40px' }}>
+        You've already completed today's puzzle! Come back tomorrow for a new one.
+      </div>
+    );
+  }
+
   const roundLetters = [...puzzle.rounds].sort((a, b) => a.round - b.round).map((r) => r.letters);
+  const savedState = (gameSession.final_board_state as PersistedGameState | null) ?? undefined;
 
   return (
     <GameScreen
       key={gameSession.id}
       active={active}
       roundLetters={roundLetters}
+      savedState={savedState}
+      onSaveState={(state) => {
+        saveSessionState(gameSession.id, state).catch((err) => {
+          console.error('Failed to save session state:', err);
+        });
+      }}
       onRoundComplete={(round) => {
         completeRound(gameSession.id, round).catch((err) => {
           console.error('Failed to record round completion:', err);

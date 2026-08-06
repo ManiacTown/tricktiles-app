@@ -29,6 +29,29 @@ interface Snapshot {
   rack: Tile[];
 }
 
+// The subset of GameState worth persisting server-side so a player who
+// closes the tab mid-round doesn't lose progress on the daily puzzle.
+// Deliberately excludes undo history (fine to lose on reload) and
+// roundLetters (already known independently from the fetched puzzle).
+export interface PersistedGameState {
+  board: Board;
+  rack: Tile[];
+  round: number;
+  startTime: number;
+  endTime: number | null;
+  roundScores: number[];
+  roundCompletedAt: number[];
+}
+
+export function toPersistedState(state: GameState): PersistedGameState {
+  const { board, rack, round, startTime, endTime, roundScores, roundCompletedAt } = state;
+  return { board, rack, round, startTime, endTime, roundScores, roundCompletedAt };
+}
+
+export function hydrateState(persisted: PersistedGameState, roundLetters?: string[]): GameState {
+  return { ...persisted, history: [], roundLetters };
+}
+
 export type GameAction =
   | { type: 'MOVE_TILE'; tileId: string; to: { kind: 'rack' } | { kind: 'board'; r: number; c: number } }
   | { type: 'SHUFFLE_RACK' }

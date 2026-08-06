@@ -14,7 +14,8 @@ import { Rack } from './Rack';
 import { Hud } from './Hud';
 import { Controls } from './Controls';
 import { Overlay } from './Overlay';
-import { createInitialState, gameReducer } from '../game/gameState';
+import { createInitialState, gameReducer, hydrateState, toPersistedState } from '../game/gameState';
+import type { PersistedGameState } from '../game/gameState';
 import { LETTER_VALUES } from '../game/letterBag';
 import { COLS, ROUNDS, ROWS } from '../game/rounds';
 import { validateBoard } from '../game/validator';
@@ -60,6 +61,15 @@ interface GameScreenProps {
   // Fixed per-round letters for daily-puzzle mode; omitted for practice
   // mode, which deals randomly from the local letter bag instead.
   roundLetters?: string[];
+  // Resumes an in-progress (or already-finished) session's board instead of
+  // dealing a fresh one. Only meaningful together with roundLetters — the
+  // caller (DailyChallenge) is expected to remount GameScreen (via a `key`
+  // on the session id) rather than change this prop in place.
+  savedState?: PersistedGameState;
+  // Debounced checkpoint callback, fired a moment after any board/rack/round
+  // change so a closed tab loses at most a few seconds of progress. Omitted
+  // in practice mode, which has nowhere to persist to.
+  onSaveState?: (state: PersistedGameState) => void;
   // Called with the 1-indexed round number right as it's completed —
   // daily mode uses this to record the completion server-side.
   onRoundComplete?: (round: number) => void;
@@ -82,13 +92,21 @@ interface GameScreenProps {
 
 export function GameScreen({
   roundLetters,
+  savedState,
+  onSaveState,
   onRoundComplete,
   onPlayAgain,
   adminSolution,
   onAdminComplete,
   active = true,
 }: GameScreenProps) {
-  const [state, dispatch] = useReducer(gameReducer, roundLetters, createInitialState);
+  // Lazy initializer only — savedState/roundLetters are read once at mount.
+  // DailyChallenge remounts this component (via `key={gameSession.id}`)
+  // whenever the underlying session changes, so there's no case where
+  // these props change under a live GameScreen instance.
+  const [state, dispatch] = useReducer(gameReducer, null, () =>
+    savedState ? hydrateState(savedState, roundLetters) : createInitialState(roundLetters),
+  );
   const [activeTileId, setActiveTileId] = useState<string | null>(null);
   // The dragged tile's own on-screen size at the moment the drag starts —
   // applied explicitly to the DragOverlay clone so it renders at its real
@@ -108,6 +126,17 @@ export function GameScreen({
   }, [finished]);
 
   const elapsedSeconds = Math.floor(((state.endTime ?? Date.now()) - state.startTime) / 1000);
+
+  // Debounced auto-save checkpoint: fires ~1s after board/rack/round
+  // settles, rather than on every single tile move. onSaveState is a ref
+  // (not a dep) since DailyChallenge passes a fresh closure each render.
+  const onSaveStateRef = useRef(onSaveState);
+  onSaveStateRef.current = onSaveState;
+  useEffect(() => {
+    if (!onSaveStateRef.current) return;
+    const id = setTimeout(() => onSaveStateRef.current?.(toPersistedState(state)), 1000);
+    return () => clearTimeout(id);
+  }, [state]);
 
   const validation = useMemo(
     () => validateBoard(state.board, state.rack.length === 0),

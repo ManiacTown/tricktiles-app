@@ -1,5 +1,6 @@
 import { supabase } from './client';
 import { ROUNDS } from '../game/rounds';
+import type { PersistedGameState } from '../game/gameState';
 import type { DailyPuzzleRow, GameSessionRow, LeaderboardRow } from './types';
 
 // UTC calendar date, matching solver/generate's seedFromDate — see the
@@ -55,6 +56,20 @@ export async function completeRound(sessionId: string, roundNumber: number): Pro
     p_round_number: roundNumber,
     p_total_rounds: ROUNDS,
   });
+  if (error) throw error;
+}
+
+// Auto-save checkpoint for an in-progress daily session, so closing the tab
+// mid-round doesn't lose progress. The RLS policy "users can update their
+// own in-progress sessions" scopes this to status = 'in_progress' — once a
+// session is completed, the UPDATE matches zero rows and silently no-ops
+// rather than erroring, which is fine since GameScreen stops calling this
+// once the round is finished.
+export async function saveSessionState(sessionId: string, state: PersistedGameState): Promise<void> {
+  const { error } = await supabase
+    .from('game_sessions')
+    .update({ final_board_state: state })
+    .eq('id', sessionId);
   if (error) throw error;
 }
 
