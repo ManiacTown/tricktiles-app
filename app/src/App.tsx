@@ -24,7 +24,7 @@ function App() {
         </div>
       </header>
 
-      <div className="controls" style={{ marginTop: 0, marginBottom: '10px' }}>
+      <div className="controls mode-tabs" style={{ marginTop: 0, marginBottom: '10px' }}>
         {TABS.map((tab) => (
           <button
             key={tab.mode}

@@ -7,9 +7,10 @@ header {
   width: 100%;
   max-width: 660px;
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   margin-bottom: 8px;
+  text-align: center;
 }
 h1 {
   font-size: 24px;
@@ -245,6 +246,13 @@ button:disabled {
   border: 1px solid var(--border);
 }
 
+/* Modifier for the mode-switcher's .controls row specifically — plain
+   .controls (GameScreen's shuffle/undo/next row) relies on the default
+   flex-start so #nextBtn's flex:1 fills the remaining space, so the
+   centering can't live on .controls itself. */
+.mode-tabs {
+  justify-content: center;
+}
 .mode-tab {
   background: var(--surface);
   color: var(--ink);
