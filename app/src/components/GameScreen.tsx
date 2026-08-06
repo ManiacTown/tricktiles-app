@@ -73,7 +73,11 @@ interface GameScreenProps {
   // Called with the 1-indexed round number right as it's completed —
   // daily mode uses this to record the completion server-side.
   onRoundComplete?: (round: number) => void;
-  onPlayAgain?: () => void;
+  // Daily-only display number for the result overlay ("Daily Puzzle
+  // #122"). Omitted in practice mode, where the overlay shows a plain
+  // "(Practice)" label instead — see the hardcoded placeholder note in
+  // DailyChallenge.tsx.
+  puzzleNumber?: number;
   // Admin/testing shortcut: when provided, shows a "Complete Puzzle"
   // button that jumps straight to the finished state using this
   // pre-solved reference board (see build plan section 6). Only wired up
@@ -95,7 +99,7 @@ export function GameScreen({
   savedState,
   onSaveState,
   onRoundComplete,
-  onPlayAgain,
+  puzzleNumber,
   adminSolution,
   onAdminComplete,
   active = true,
@@ -118,6 +122,13 @@ export function GameScreen({
   const [, forceTick] = useState(0);
 
   const finished = state.endTime !== null;
+  // Clicking out of the result overlay (or its Exit button) hides it
+  // without un-finishing the round — the board stays visible underneath,
+  // read-only (see Controls' disabled prop below). Reset back to false
+  // wherever a fresh round actually starts (RESTART, in handleExit below)
+  // so a later finish in the same GameScreen instance shows the overlay
+  // again instead of staying permanently dismissed.
+  const [overlayDismissed, setOverlayDismissed] = useState(false);
 
   useEffect(() => {
     if (finished) return;
@@ -389,6 +400,20 @@ export function GameScreen({
     onAdminComplete?.();
   }
 
+  // Backdrop click or the overlay's own Exit button. Daily mode's puzzle is
+  // already scored server-side, so exiting just reveals the finished board
+  // underneath (read-only — see Controls' disabled prop below). Practice
+  // mode has no other way back into a playable board, so exiting there
+  // also deals a fresh one, same as the old "Play Again" behavior.
+  function handleExit() {
+    setOverlayDismissed(true);
+    if (!roundLetters) {
+      dispatch({ type: 'RESTART' });
+      setSelectedTileIds(new Set());
+      setOverlayDismissed(false);
+    }
+  }
+
   return (
     <>
       <Hud round={state.round} elapsedSeconds={elapsedSeconds} score={displayScore} />
@@ -429,19 +454,28 @@ export function GameScreen({
         canUndo={state.history.length > 0}
         ready={validation.complete}
         isLastRound={isLastRound}
+        disabled={finished}
       />
 
       <div className="status">
-        {notReadyMessage ??
-          statusMessage(
-            validation.complete,
-            state.rack.length,
-            validation.hasIsolatedTiles,
-            validation.isConnected,
-            validation.allWordsValid,
-            state.round,
-          )}
+        {finished
+          ? '🎉 Solved!'
+          : (notReadyMessage ??
+            statusMessage(
+              validation.complete,
+              state.rack.length,
+              validation.hasIsolatedTiles,
+              validation.isConnected,
+              validation.allWordsValid,
+              state.round,
+            ))}
       </div>
+
+      {finished && overlayDismissed && (
+        <button className="admin-btn" style={{ marginTop: '12px' }} onClick={() => setOverlayDismissed(false)}>
+          View Result
+        </button>
+      )}
 
       {adminSolution && !finished && (
         <button className="admin-btn" style={{ marginTop: '12px' }} onClick={handleAdminComplete}>
@@ -450,7 +484,7 @@ export function GameScreen({
       )}
 
       <Overlay
-        show={finished}
+        show={finished && !overlayDismissed}
         finalTime={formatTime(elapsedSeconds)}
         finalScore={lockedTotal}
         rounds={state.roundScores.map((roundScore, i) => ({
@@ -460,13 +494,8 @@ export function GameScreen({
             (state.roundCompletedAt[i] - (i === 0 ? state.startTime : state.roundCompletedAt[i - 1])) / 1000,
           ),
         }))}
-        onPlayAgain={
-          onPlayAgain ??
-          (() => {
-            dispatch({ type: 'RESTART' });
-            setSelectedTileIds(new Set());
-          })
-        }
+        puzzleNumber={puzzleNumber}
+        onExit={handleExit}
       />
     </>
   );

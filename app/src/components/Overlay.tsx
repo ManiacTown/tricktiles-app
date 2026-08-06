@@ -1,3 +1,6 @@
+import { useState } from 'react';
+import { buildShareText } from '../game/shareText';
+
 interface RoundSummary {
   round: number;
   score: number;
@@ -9,7 +12,11 @@ interface OverlayProps {
   finalTime: string;
   finalScore: number;
   rounds: RoundSummary[];
-  onPlayAgain: () => void;
+  // Daily-only — see the hardcoded placeholder note where this is passed
+  // in from DailyChallenge.tsx. Undefined in practice mode, where the
+  // puzzle-number line and share text both fall back to a plain label.
+  puzzleNumber?: number;
+  onExit: () => void;
 }
 
 function formatRoundTime(totalSeconds: number): string {
@@ -18,38 +25,110 @@ function formatRoundTime(totalSeconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-export function Overlay({ show, finalTime, finalScore, rounds, onPlayAgain }: OverlayProps) {
+export function Overlay({ show, finalTime, finalScore, rounds, puzzleNumber, onExit }: OverlayProps) {
+  const [shareStatus, setShareStatus] = useState('');
+
+  function flashStatus(message: string) {
+    setShareStatus(message);
+    setTimeout(() => setShareStatus(''), 2500);
+  }
+
+  async function handleShare() {
+    const text = buildShareText({ puzzleNumber, time: finalTime, score: finalScore });
+    // Native share sheet on mobile when available; clipboard everywhere
+    // else. navigator.share rejects on user-cancel — swallowed rather than
+    // falling through to the clipboard path, which would show a
+    // misleading "cancel = copied" success message.
+    if (navigator.share) {
+      try {
+        await navigator.share({ text });
+      } catch {
+        // cancelled — not a failure
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      flashStatus('Copied to clipboard!');
+    } catch {
+      flashStatus('Could not copy — try again.');
+    }
+  }
+
+  // Always copies, regardless of navigator.share support — for people who
+  // specifically want the clipboard path (e.g. to paste into a chat)
+  // rather than whatever the OS share sheet offers.
+  async function handleCopy() {
+    const text = buildShareText({ puzzleNumber, time: finalTime, score: finalScore });
+    try {
+      await navigator.clipboard.writeText(text);
+      flashStatus('Copied to clipboard!');
+    } catch {
+      flashStatus('Could not copy — try again.');
+    }
+  }
+
   return (
-    <div id="overlay" className={show ? 'show' : undefined}>
-      <div className="card">
-        <h2 className="stamp">FINISHED!</h2>
-        <div className="small">Total Time</div>
-        <div className="big">{finalTime}</div>
-        <div className="small">Score</div>
-        <div className="big">{finalScore}</div>
+    <div
+      id="overlay"
+      className={show ? 'show' : undefined}
+      // Only dismiss on a click that lands on the backdrop itself — one
+      // that bubbles up from inside the card (e.g. a button) shouldn't
+      // close it.
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onExit();
+      }}
+    >
+      <div className="result-card">
+        <div className="stamp result-wordmark">TRICKTILES</div>
+        {puzzleNumber != null && <div className="result-puzzle-number">Daily Puzzle #{puzzleNumber}</div>}
+        <h2 className="stamp result-title">Solved!</h2>
+
+        <div className="result-stats">
+          <div className="stat-tile">
+            <div className="stat-value">{finalTime}</div>
+            <div className="stat-label">Time</div>
+          </div>
+          <div className="stat-tile">
+            <div className="stat-value">{finalScore}</div>
+            <div className="stat-label">Score</div>
+          </div>
+        </div>
 
         {rounds.length > 0 && (
-          <table style={{ width: '100%', marginTop: '16px', fontSize: '12px', borderCollapse: 'collapse' }}>
+          <table className="result-rounds">
             <thead>
-              <tr style={{ opacity: 0.6 }}>
-                <th style={{ textAlign: 'left', fontWeight: 600, padding: '4px 0' }}>Round</th>
-                <th style={{ textAlign: 'right', fontWeight: 600, padding: '4px 0' }}>Time</th>
-                <th style={{ textAlign: 'right', fontWeight: 600, padding: '4px 0' }}>Score</th>
+              <tr>
+                <th>Round</th>
+                <th>Time</th>
+                <th>Score</th>
               </tr>
             </thead>
             <tbody>
               {rounds.map((r) => (
-                <tr key={r.round} style={{ borderTop: '1px solid rgba(0,0,0,0.08)' }}>
-                  <td style={{ textAlign: 'left', padding: '4px 0' }}>{r.round}</td>
-                  <td style={{ textAlign: 'right', padding: '4px 0' }}>{formatRoundTime(r.elapsedSeconds)}</td>
-                  <td style={{ textAlign: 'right', padding: '4px 0' }}>{r.score}</td>
+                <tr key={r.round}>
+                  <td>{r.round}</td>
+                  <td>{formatRoundTime(r.elapsedSeconds)}</td>
+                  <td>{r.score}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         )}
 
-        <button onClick={onPlayAgain}>Play Again</button>
+        <div className="result-actions">
+          <button className="result-share-btn" onClick={handleShare}>
+            Share Result
+          </button>
+          <button className="result-copy-btn" onClick={handleCopy}>
+            Copy Result
+          </button>
+        </div>
+        {shareStatus && <div className="result-status">{shareStatus}</div>}
+
+        <button className="admin-btn result-exit" onClick={onExit}>
+          Exit
+        </button>
       </div>
     </div>
   );

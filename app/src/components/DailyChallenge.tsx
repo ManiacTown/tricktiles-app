@@ -75,6 +75,9 @@ export function DailyChallenge({ active = true }: DailyChallengeProps) {
       active={active}
       roundLetters={roundLetters}
       savedState={savedState}
+      // Placeholder — daily_puzzles has no sequential puzzle number yet
+      // (just a date). Swap for the real count once that's added.
+      puzzleNumber={122}
       onSaveState={(state) => {
         saveSessionState(gameSession.id, state).catch((err) => {
           console.error('Failed to save session state:', err);
