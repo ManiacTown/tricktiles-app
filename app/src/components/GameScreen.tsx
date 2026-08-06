@@ -309,13 +309,17 @@ export function GameScreen({
   activeRef.current = active;
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
+  // Once finished, the board is a read-only look-back at an already-scored
+  // puzzle — nothing left for a keyboard shortcut to legitimately do.
+  const finishedRef = useRef(finished);
+  finishedRef.current = finished;
 
   // Keyboard shortcuts, attached once via refs/callbacks rather than
   // depending on state directly, so the listener never goes stale without
   // needing to be torn down and re-attached on every render.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (!activeRef.current || pausedRef.current) return;
+      if (!activeRef.current || pausedRef.current || finishedRef.current) return;
       const target = e.target as HTMLElement | null;
       if (target && ['INPUT', 'TEXTAREA'].includes(target.tagName)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -397,10 +401,15 @@ export function GameScreen({
   }, []);
 
   function handleDragStart(event: DragStartEvent) {
-    // Belt-and-suspenders — the pause modal's backdrop already blocks
-    // pointer events from reaching the board, but this covers any edge
-    // case (e.g. a drag that started just before pausing).
-    if (paused) return;
+    // Belt-and-suspenders for the paused case — the pause modal's backdrop
+    // already blocks pointer events from reaching the board, but this
+    // covers any edge case (e.g. a drag that started just before pausing).
+    // The finished check is the one that actually matters day-to-day: once
+    // the round is over and scored, there's no overlay/backdrop blocking
+    // the board itself (see Overlay/GameScreen — it stays visible and
+    // dismissible underneath the result screen), so without this a player
+    // could still drag their already-submitted board's tiles around.
+    if (paused || finished) return;
     setActiveTileId(event.active.id as string);
     // Measured directly from the DOM via the tile's data-tile-id rather
     // than dnd-kit's own rect.current.initial — with a small activation
@@ -418,6 +427,14 @@ export function GameScreen({
   function handleDragEnd(event: DragEndEvent) {
     setActiveTileId(null);
     setActiveTileSize(null);
+    // dnd-kit's own drag machinery (useDraggable's listeners, wired
+    // directly onto each tile) runs independently of handleDragStart's
+    // early return above — that only skips this component's own overlay
+    // state, it doesn't stop dnd-kit from still calling onDragEnd for a
+    // gesture that completes anyway. This is the guard that actually
+    // matters: without it, a drag started and finished entirely within one
+    // gesture would still dispatch a move on a paused/finished board.
+    if (paused || finished) return;
     const { active, over } = event;
     if (!over) return;
     const tileId = active.id as string;
@@ -511,7 +528,14 @@ export function GameScreen({
             cellStatus={validation.cellStatus}
             typingCursor={typingCursor}
             onHoverCell={(cell) => setTypingCursor(cell)}
-            onDeleteTile={(tileId) => dispatch({ type: 'MOVE_TILE', tileId, to: { kind: 'rack' } })}
+            onDeleteTile={(tileId) => {
+              // Right-click-to-delete bypasses both the keyboard guard and
+              // handleDragStart's own paused/finished check (see those) —
+              // it's wired straight from TileView's onContextMenu, so it
+              // needs its own guard here.
+              if (paused || finished) return;
+              dispatch({ type: 'MOVE_TILE', tileId, to: { kind: 'rack' } });
+            }}
             selectedTileIds={selectedTileIds}
             onSelectionChange={(ids) => setSelectedTileIds(new Set(ids))}
           />
