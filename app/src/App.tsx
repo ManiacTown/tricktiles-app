@@ -39,14 +39,18 @@ function App() {
       {/* All three tabs stay mounted and are only hidden via CSS, rather
           than conditionally rendered — switching tabs would otherwise
           unmount/remount each one, losing the in-progress board, fetched
-          daily puzzle, etc. every time. */}
-      <div style={{ display: mode === 'daily' ? 'contents' : 'none' }}>
+          daily puzzle, etc. every time. Each panel centers its own
+          children directly (rather than using display:contents to let
+          them be centered by #root) since display:contents has
+          historically inconsistent support for promoting children into a
+          flex layout across browsers. */}
+      <div className={`tab-panel${mode === 'daily' ? '' : ' tab-panel-hidden'}`}>
         <DailyChallenge active={mode === 'daily'} />
       </div>
-      <div style={{ display: mode === 'practice' ? 'contents' : 'none' }}>
+      <div className={`tab-panel${mode === 'practice' ? '' : ' tab-panel-hidden'}`}>
         <GameScreen active={mode === 'practice'} />
       </div>
-      <div style={{ display: mode === 'profile' ? 'contents' : 'none' }}>
+      <div className={`tab-panel${mode === 'profile' ? '' : ' tab-panel-hidden'}`}>
         <Profile />
       </div>
     </>

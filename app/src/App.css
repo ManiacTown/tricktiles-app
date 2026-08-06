@@ -256,6 +256,16 @@ button:disabled {
   border-color: var(--accent);
 }
 
+.tab-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+.tab-panel-hidden {
+  display: none;
+}
+
 .admin-btn {
   background: var(--surface);
   color: var(--ink-soft);
