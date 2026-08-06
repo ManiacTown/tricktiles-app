@@ -1,7 +1,7 @@
 import { supabase } from './client';
 import { ROUNDS } from '../game/rounds';
 import type { PersistedGameState } from '../game/gameState';
-import type { DailyPuzzleRow, GameSessionRow, LeaderboardRow } from './types';
+import type { BadgeRow, DailyPuzzleRow, GameSessionRow, LeaderboardRow } from './types';
 
 // UTC calendar date, matching solver/generate's seedFromDate — see the
 // timezone decision documented in tricktiles_build_plan.md section 2.
@@ -126,4 +126,23 @@ export async function getProfileStats(userId: string): Promise<ProfileStats> {
     bestTimeSeconds: Math.min(...times),
     averageTimeSeconds: Math.round(times.reduce((a, b) => a + b, 0) / times.length),
   };
+}
+
+// "badges are publicly readable" (see the schema) — no auth needed for the
+// catalog itself, just for knowing which ones a given player has earned.
+export async function getBadges(): Promise<BadgeRow[]> {
+  const { data, error } = await supabase.from('badges').select('*').order('name');
+  if (error) throw error;
+  return data as BadgeRow[];
+}
+
+// RLS scopes badge_unlocks to "own rows only," so this is implicitly
+// "this user's" unlocks regardless of the userId passed in — kept as a
+// parameter anyway since every other per-user query in this file takes
+// one, rather than silently relying on the caller already being the
+// signed-in user.
+export async function getUnlockedBadgeIds(userId: string): Promise<Set<string>> {
+  const { data, error } = await supabase.from('badge_unlocks').select('badge_id').eq('user_id', userId);
+  if (error) throw error;
+  return new Set((data as Array<{ badge_id: string }>).map((row) => row.badge_id));
 }

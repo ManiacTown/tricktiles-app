@@ -277,12 +277,25 @@ button:disabled {
   border: 1px solid var(--border);
 }
 
+.shift-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.shift-label {
+  font-size: 9px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
 .shift-controls {
   display: grid;
   grid-template-columns: repeat(3, 28px);
   grid-template-rows: repeat(2, 28px);
   gap: 4px;
-  flex-shrink: 0;
 }
 .shift-btn {
   background: var(--surface);
@@ -616,4 +629,72 @@ button:disabled {
   text-transform: uppercase;
   color: var(--ink-soft);
   margin-top: 6px;
+}
+
+/* Badges page — a grid of category "containers" (Pushdle's own term for
+   this pattern), each one a card holding a vertical list of individual
+   badge rows. alignItems:start keeps a short container from being
+   stretched to match a taller one sharing its grid row. */
+.badges-header {
+  width: 100%;
+  max-width: 660px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+.badge-categories {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  width: 100%;
+  max-width: 660px;
+  align-items: start;
+}
+.badge-container {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+}
+.badge-container h3 {
+  margin: 0 0 14px;
+  font-size: 15px;
+}
+.badge-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.badge-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--board-bg);
+  opacity: 0.55;
+}
+.badge-card-earned {
+  opacity: 1;
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.badge-icon {
+  font-size: 22px;
+  flex-shrink: 0;
+  width: 32px;
+  text-align: center;
+}
+.badge-info {
+  min-width: 0;
+}
+.badge-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.badge-description {
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-top: 2px;
 }

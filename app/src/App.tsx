@@ -3,13 +3,15 @@ import './App.css';
 import { GameScreen } from './components/GameScreen';
 import { DailyChallenge } from './components/DailyChallenge';
 import { Profile } from './components/Profile';
+import { Badges } from './components/Badges';
 
-type Mode = 'daily' | 'practice' | 'profile';
+type Mode = 'daily' | 'practice' | 'profile' | 'badges';
 
 const TABS: Array<{ mode: Mode; label: string }> = [
   { mode: 'daily', label: 'Daily Challenge' },
   { mode: 'practice', label: 'Practice' },
   { mode: 'profile', label: 'Profile' },
+  { mode: 'badges', label: 'Badges' },
 ];
 
 function App() {
@@ -52,6 +54,9 @@ function App() {
       </div>
       <div className={`tab-panel${mode === 'profile' ? '' : ' tab-panel-hidden'}`}>
         <Profile />
+      </div>
+      <div className={`tab-panel${mode === 'badges' ? '' : ' tab-panel-hidden'}`}>
+        <Badges />
       </div>
     </>
   );

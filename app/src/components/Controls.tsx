@@ -18,34 +18,42 @@ interface ControlsProps {
 export function Controls({ onShift, onUndo, onNext, canUndo, ready, isLastRound, disabled = false }: ControlsProps) {
   return (
     <div className="controls">
-      <div className="shift-controls" role="group" aria-label="Shift board">
-        <button
-          className="shift-btn"
-          onClick={() => onShift(0, -1)}
-          disabled={disabled}
-          aria-label="Shift board left"
-        >
-          ←
-        </button>
-        <button className="shift-btn" onClick={() => onShift(-1, 0)} disabled={disabled} aria-label="Shift board up">
-          ↑
-        </button>
-        <button
-          className="shift-btn"
-          onClick={() => onShift(1, 0)}
-          disabled={disabled}
-          aria-label="Shift board down"
-        >
-          ↓
-        </button>
-        <button
-          className="shift-btn"
-          onClick={() => onShift(0, 1)}
-          disabled={disabled}
-          aria-label="Shift board right"
-        >
-          →
-        </button>
+      <div className="shift-group">
+        <div className="shift-controls" role="group" aria-label="Shift board">
+          <button
+            className="shift-btn"
+            onClick={() => onShift(0, -1)}
+            disabled={disabled}
+            aria-label="Shift board left"
+          >
+            ←
+          </button>
+          <button
+            className="shift-btn"
+            onClick={() => onShift(-1, 0)}
+            disabled={disabled}
+            aria-label="Shift board up"
+          >
+            ↑
+          </button>
+          <button
+            className="shift-btn"
+            onClick={() => onShift(1, 0)}
+            disabled={disabled}
+            aria-label="Shift board down"
+          >
+            ↓
+          </button>
+          <button
+            className="shift-btn"
+            onClick={() => onShift(0, 1)}
+            disabled={disabled}
+            aria-label="Shift board right"
+          >
+            →
+          </button>
+        </div>
+        <div className="shift-label">Shift Board</div>
       </div>
       <button id="undoBtn" onClick={onUndo} disabled={disabled || !canUndo}>
         Undo
