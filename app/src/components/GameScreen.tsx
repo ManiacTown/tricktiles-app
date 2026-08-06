@@ -319,6 +319,19 @@ export function GameScreen({
     dispatch({ type: 'MOVE_TILE', tileId: tile.id, to: { kind: 'rack' } });
   }
 
+  // Rigid whole-board shift, one cell at a time — reuses MOVE_GROUP (built
+  // for marquee-drag/arrow-nudge) with every placed tile's ID as the
+  // group, so a move that would push anything off the edge is rejected as
+  // a no-op exactly like a smaller group move would be, with no separate
+  // reducer logic needed.
+  function handleShiftBoard(dr: number, dc: number) {
+    if (paused || finished) return;
+    const tileIds: string[] = [];
+    for (const row of state.board) for (const t of row) if (t) tileIds.push(t.id);
+    if (tileIds.length === 0) return;
+    dispatch({ type: 'MOVE_GROUP', tileIds, dr, dc });
+  }
+
   // Refs so the keydown effect below can be attached once (empty deps)
   // while always calling the latest version of these instead of going
   // stale after the first render.
@@ -376,6 +389,18 @@ export function GameScreen({
         ArrowLeft: [0, -1],
         ArrowRight: [0, 1],
       };
+      // Shift+Arrow shifts the whole board one cell, regardless of any
+      // active marquee selection — checked first so it takes priority over
+      // (rather than falling through to) the selection-only nudge below.
+      if (e.shiftKey && e.key in ARROW_DELTAS) {
+        e.preventDefault();
+        const [dr, dc] = ARROW_DELTAS[e.key];
+        const tileIds: string[] = [];
+        for (const row of boardRef.current) for (const t of row) if (t) tileIds.push(t.id);
+        if (tileIds.length > 0) dispatchRef.current({ type: 'MOVE_GROUP', tileIds, dr, dc });
+        return;
+      }
+
       if (e.key in ARROW_DELTAS && selectedTileIdsRef.current.size > 0) {
         e.preventDefault();
         const [dr, dc] = ARROW_DELTAS[e.key];
@@ -578,7 +603,7 @@ export function GameScreen({
       </DndContext>
 
       <Controls
-        onShuffle={() => dispatch({ type: 'SHUFFLE_RACK' })}
+        onShift={handleShiftBoard}
         onUndo={() => dispatch({ type: 'UNDO' })}
         onNext={handleCompleteRound}
         canUndo={state.history.length > 0}

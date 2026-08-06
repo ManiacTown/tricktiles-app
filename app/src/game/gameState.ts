@@ -54,7 +54,6 @@ export function hydrateState(persisted: PersistedGameState, roundLetters?: strin
 
 export type GameAction =
   | { type: 'MOVE_TILE'; tileId: string; to: { kind: 'rack' } | { kind: 'board'; r: number; c: number } }
-  | { type: 'SHUFFLE_RACK' }
   // liveScore is the full-board score at the moment the round completes,
   // computed by the caller (which already has the validator result) — the
   // reducer derives this round's own delta from it rather than
@@ -62,14 +61,15 @@ export type GameAction =
   | { type: 'ADVANCE_ROUND'; liveScore: number }
   | { type: 'RESTART' }
   | { type: 'UNDO' }
-  // Moves a whole set of board tiles (a marquee selection) by the same
-  // (dr, dc) offset in one shot — used by both group-drag and arrow-key
-  // nudging. If any tile in the group would go out of bounds or land on
-  // a cell occupied by something outside the group, the whole move is
-  // rejected (no-op) rather than partially applied — see gameState.ts's
-  // moveGroup. Tiles moving into cells vacated by other group members are
-  // always fine, since a rigid shift can never make group members
-  // collide with each other.
+  // Moves a whole set of board tiles by the same (dr, dc) offset in one
+  // shot — used by group-drag, arrow-key nudging of a marquee selection,
+  // and the shift-the-whole-board controls (GameScreen passes every
+  // placed tile's ID as the group in that last case). If any tile in the
+  // group would go out of bounds or land on a cell occupied by something
+  // outside the group, the whole move is rejected (no-op) rather than
+  // partially applied — see gameState.ts's moveGroup. Tiles moving into
+  // cells vacated by other group members are always fine, since a rigid
+  // shift can never make group members collide with each other.
   | { type: 'MOVE_GROUP'; tileIds: string[]; dr: number; dc: number }
   // Admin/testing shortcut: jump straight to a finished game with a given
   // (already-solved, already-translated-to-fit-the-board) board and final
@@ -184,15 +184,6 @@ function moveGroup(state: GameState, tileIds: string[], dr: number, dc: number):
   return { ...state, ...pushHistory(state), board };
 }
 
-function shuffleRack(state: GameState): GameState {
-  const rack = [...state.rack];
-  for (let i = rack.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [rack[i], rack[j]] = [rack[j], rack[i]];
-  }
-  return { ...state, rack };
-}
-
 // Exported (not just used internally by the reducer below) so
 // GameScreen's handleCompleteRound can compute what the post-advance
 // state WILL be — specifically its endTime — in order to save it before
@@ -242,8 +233,6 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
     case 'MOVE_TILE':
       return moveTile(state, action);
-    case 'SHUFFLE_RACK':
-      return shuffleRack(state);
     case 'ADVANCE_ROUND':
       return advanceRound(state, action.liveScore);
     case 'RESTART':

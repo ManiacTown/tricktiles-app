@@ -271,15 +271,50 @@ button:disabled {
   opacity: 0.4;
   cursor: default;
 }
-#shuffleBtn,
 #undoBtn {
   background: var(--surface);
   color: var(--ink);
   border: 1px solid var(--border);
 }
 
+.shift-controls {
+  display: grid;
+  grid-template-columns: repeat(3, 28px);
+  grid-template-rows: repeat(2, 28px);
+  gap: 4px;
+  flex-shrink: 0;
+}
+.shift-btn {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1;
+}
+/* Compact D-pad: tall left/right buttons flank a stacked up/down pair in
+   the middle column — fits the Controls row's height without needing a
+   full 3x3 plus shape. */
+.shift-controls button:nth-child(1) {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+} /* left */
+.shift-controls button:nth-child(2) {
+  grid-column: 2;
+  grid-row: 1;
+} /* up */
+.shift-controls button:nth-child(3) {
+  grid-column: 2;
+  grid-row: 2;
+} /* down */
+.shift-controls button:nth-child(4) {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+} /* right */
+
 /* Modifier for the mode-switcher's .controls row specifically — plain
-   .controls (GameScreen's shuffle/undo/next row) relies on the default
+   .controls (GameScreen's shift/undo/next row) relies on the default
    flex-start so #nextBtn's flex:1 fills the remaining space, so the
    centering can't live on .controls itself. */
 .mode-tabs {
