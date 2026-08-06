@@ -37,47 +37,52 @@ export function Profile() {
     return <SignIn onSignUp={signUp} onSignIn={signIn} />;
   }
 
+  const statTiles = stats
+    ? [
+        { label: 'Games Played', value: String(stats.gamesPlayed) },
+        { label: 'Best Time', value: formatTime(stats.bestTimeSeconds!) },
+        { label: 'Avg Time', value: formatTime(stats.averageTimeSeconds!) },
+      ]
+    : [];
+
   return (
-    <div className="card" style={{ margin: '20px auto' }}>
-      <h2 className="stamp">{profile.username}</h2>
-      <div className="small" style={{ marginBottom: '16px' }}>
-        Daily challenge stats
-      </div>
-
-      {error && <div style={{ color: 'var(--invalid)', fontSize: '12px' }}>{error}</div>}
-
-      {!error && !stats && <div className="small">Loading...</div>}
-
-      {!error && stats && stats.gamesPlayed === 0 && (
-        <div className="small">You haven't completed a daily puzzle yet — finish one to see your stats here.</div>
-      )}
-
-      {!error && stats && stats.gamesPlayed > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'space-around', marginTop: '8px' }}>
-          <div>
-            <div className="small">Games Played</div>
-            <div className="big" style={{ fontSize: '22px' }}>
-              {stats.gamesPlayed}
-            </div>
-          </div>
-          <div>
-            <div className="small">Best Time</div>
-            <div className="big" style={{ fontSize: '22px' }}>
-              {formatTime(stats.bestTimeSeconds!)}
-            </div>
-          </div>
-          <div>
-            <div className="small">Avg Time</div>
-            <div className="big" style={{ fontSize: '22px' }}>
-              {formatTime(stats.averageTimeSeconds!)}
-            </div>
+    <>
+      <div className="profile-header">
+        <div>
+          <h2 className="stamp" style={{ margin: 0 }}>
+            {profile.username}
+          </h2>
+          <div className="subtitle" style={{ marginTop: '4px' }}>
+            Daily Challenge Stats
           </div>
         </div>
-      )}
+        <button className="admin-btn" onClick={signOut}>
+          Sign Out
+        </button>
+      </div>
 
-      <button className="admin-btn" style={{ marginTop: '20px', width: '100%' }} onClick={signOut}>
-        Sign Out
-      </button>
-    </div>
+      <div className="profile-panel">
+        <h3>Stats</h3>
+
+        {error && <div style={{ color: 'var(--invalid)', fontSize: '12px' }}>{error}</div>}
+
+        {!error && !stats && <div className="small">Loading...</div>}
+
+        {!error && stats && stats.gamesPlayed === 0 && (
+          <div className="small">You haven't completed a daily puzzle yet — finish one to see your stats here.</div>
+        )}
+
+        {!error && stats && stats.gamesPlayed > 0 && (
+          <div className="stat-grid">
+            {statTiles.map((tile) => (
+              <div className="stat-tile" key={tile.label}>
+                <div className="stat-value">{tile.value}</div>
+                <div className="stat-label">{tile.label}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
   );
 }

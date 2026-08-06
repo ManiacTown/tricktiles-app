@@ -347,3 +347,53 @@ button:disabled {
   color: #ffffff;
   width: 100%;
 }
+
+/* Profile page: identity row (username + sign out) pinned above a Stats
+   panel of individual tile cards, rather than one centered card with the
+   stat values just spaced across a flex row — the old layout had no
+   separation between adjacent values (e.g. two equal times rendering as
+   "43:4443:44") once they got close in width. */
+.profile-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  max-width: 660px;
+  margin-bottom: 20px;
+}
+.profile-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  width: 100%;
+  max-width: 660px;
+}
+.profile-panel h3 {
+  margin: 0 0 14px;
+  font-size: 15px;
+}
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 10px;
+}
+.stat-tile {
+  background: var(--board-bg);
+  border-radius: 10px;
+  padding: 14px 8px;
+  text-align: center;
+}
+.stat-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--accent);
+}
+.stat-label {
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-top: 6px;
+}
