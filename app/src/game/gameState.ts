@@ -41,11 +41,21 @@ export interface PersistedGameState {
   endTime: number | null;
   roundScores: number[];
   roundCompletedAt: number[];
+  // Accumulated milliseconds of confirmed-active play time (GameScreen's
+  // own bookkeeping, not derived from startTime here) — checkpointed on
+  // every save specifically so a reload while away can't inflate the
+  // displayed/final time with time spent away. See GameScreen's own
+  // activeMsRef comment for the fuller story: `now - startTime` alone
+  // can't distinguish "time spent away" from "time spent playing," and a
+  // real browser reloading a backgrounded tab (which does happen) has no
+  // way to recover time that was never tracked as excluded in the first
+  // place — this field is what makes that recoverable.
+  activeMs: number;
 }
 
-export function toPersistedState(state: GameState): PersistedGameState {
+export function toPersistedState(state: GameState, activeMs: number): PersistedGameState {
   const { board, rack, round, startTime, endTime, roundScores, roundCompletedAt } = state;
-  return { board, rack, round, startTime, endTime, roundScores, roundCompletedAt };
+  return { board, rack, round, startTime, endTime, roundScores, roundCompletedAt, activeMs };
 }
 
 export function hydrateState(persisted: PersistedGameState, roundLetters?: string[]): GameState {

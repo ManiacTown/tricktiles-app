@@ -170,25 +170,47 @@ export function GameScreen({
   // the board, and hides the rack (see the Rack render below).
   const [manuallyPaused, setManuallyPaused] = useState(false);
   // `!finished &&` guards against tabHidden toggling after a win and
-  // retroactively shrinking the already-locked final time via pausedMs
-  // below — once the round is over there's nothing left to pause.
+  // retroactively shrinking the already-locked final time — once the
+  // round is over there's nothing left to pause.
   const paused = !finished && (manuallyPaused || tabHidden || !active);
 
-  // Total time spent paused so far, subtracted out of elapsedSeconds below
-  // so the displayed/final time reflects active play time only. A ref
-  // (pauseStartRef), not state, tracks the *current* pause segment's start
-  // — only the completed total needs to trigger a re-render.
-  const [pausedMs, setPausedMs] = useState(0);
-  const pauseStartRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (paused) {
-      pauseStartRef.current = Date.now();
-    } else if (pauseStartRef.current !== null) {
-      const start = pauseStartRef.current;
-      pauseStartRef.current = null;
-      setPausedMs((prev) => prev + (Date.now() - start));
+  // Active play time, in ms — the actual source of elapsedSeconds below,
+  // and NOT computed as `now - state.startTime` the way it used to be.
+  // That wall-clock approach is what caused a real reported bug: it can't
+  // tell "time spent away" from "time spent playing," and worse, a real
+  // browser can discard/reload a backgrounded tab under memory pressure —
+  // when that happens mid-away, this component remounts from scratch, and
+  // any in-memory-only pause tracking (the old pausedMs state) is gone
+  // with it, so the restored timer silently included the entire away
+  // period. Instead this is a plain accumulator that only ever grows by
+  // real elapsed time recorded while actually active (not paused, not
+  // finished), and it's checkpointed into every save below — so a reload
+  // mid-pause restores the exact frozen value the accumulator already
+  // had, rather than resuming wall-clock math from a stale startTime.
+  //
+  // A ref, not state: both this effect and the save effects below need to
+  // read/write the authoritative up-to-the-moment value synchronously,
+  // without waiting for a setState to actually commit in a later render
+  // (which sibling effects in the same commit wouldn't see yet anyway).
+  // forceTick (existing) is what actually drives the periodic re-render
+  // needed to visibly increment the displayed number.
+  const activeMsRef = useRef(savedState?.activeMs ?? 0);
+  const activeStartRef = useRef<number | null>(null);
+
+  function flushActiveSegment() {
+    if (activeStartRef.current !== null) {
+      activeMsRef.current += Date.now() - activeStartRef.current;
+      activeStartRef.current = null;
     }
-  }, [paused]);
+  }
+
+  useEffect(() => {
+    if (!paused && !finished) {
+      activeStartRef.current = Date.now();
+    } else {
+      flushActiveSegment();
+    }
+  }, [paused, finished]);
 
   useEffect(() => {
     if (finished || paused) return;
@@ -196,11 +218,19 @@ export function GameScreen({
     return () => clearInterval(id);
   }, [finished, paused]);
 
-  // Clamped to the moment the current pause segment began, if paused —
-  // otherwise a render that happens to fire mid-pause (e.g. from some
-  // unrelated state change) would keep advancing the displayed time.
-  const nowForElapsed = paused && pauseStartRef.current !== null ? pauseStartRef.current : Date.now();
-  const elapsedSeconds = Math.floor(((state.endTime ?? nowForElapsed) - state.startTime - pausedMs) / 1000);
+  // The live value, including whatever time has passed in the current
+  // still-open active segment — flushActiveSegment() only folds a segment
+  // into activeMsRef.current once it ENDS, so reading activeMsRef.current
+  // alone mid-segment would be stale by however long that segment's been
+  // running. Used both for display and (via currentActiveMs() below) for
+  // every save checkpoint.
+  function currentActiveMs(): number {
+    return activeStartRef.current !== null
+      ? activeMsRef.current + (Date.now() - activeStartRef.current)
+      : activeMsRef.current;
+  }
+
+  const elapsedSeconds = Math.floor(currentActiveMs() / 1000);
 
   // Debounced auto-save checkpoint: fires ~1s after board/rack/round
   // settles, rather than on every single tile move. onSaveState is a ref
@@ -209,7 +239,7 @@ export function GameScreen({
   onSaveStateRef.current = onSaveState;
   useEffect(() => {
     if (!onSaveStateRef.current) return;
-    const id = setTimeout(() => onSaveStateRef.current?.(toPersistedState(state)), 1000);
+    const id = setTimeout(() => onSaveStateRef.current?.(toPersistedState(state, currentActiveMs())), 1000);
     return () => clearTimeout(id);
   }, [state]);
 
@@ -219,13 +249,14 @@ export function GameScreen({
   // discard/reload a backgrounded tab under memory pressure; without this,
   // whatever the debounced save's last snapshot happened to be could be
   // several tile-placements stale, so returning to a freshly-reloaded tab
-  // would restore an outdated board — even though the timer (persisted
-  // separately via startTime, unaffected by a reload) looked like it
-  // "resumed" normally, since only the *board* was actually stale. Keyed
-  // on `paused` alone (not `state`), same pattern as the finished-flush
-  // effect below — only meant to fire once, on the transition into paused.
+  // would restore an outdated board. currentActiveMs() here also matters
+  // for its own sake, independent of the board: it's the checkpoint that
+  // makes activeMsRef recoverable across exactly the reload this is
+  // guarding against — see that ref's own comment above. Keyed on `paused`
+  // alone (not `state`), same pattern as the finished-flush effect below —
+  // only meant to fire once, on the transition into paused.
   useEffect(() => {
-    if (paused) onSaveStateRef.current?.(toPersistedState(state));
+    if (paused) onSaveStateRef.current?.(toPersistedState(state, currentActiveMs()));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paused]);
 
@@ -241,7 +272,7 @@ export function GameScreen({
   // keyed on `finished` alone (not `state`) — only meant to fire once, on
   // the transition into the finished state.
   useEffect(() => {
-    if (finished) onSaveStateRef.current?.(toPersistedState(state));
+    if (finished) onSaveStateRef.current?.(toPersistedState(state, currentActiveMs()));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [finished]);
 
@@ -337,7 +368,7 @@ export function GameScreen({
       // dispatch below to take effect on the next render) means its own
       // Date.now() runs a few ms apart from the dispatch's — harmless,
       // since this endTime is only ever used for display, never scoring.
-      await onSaveStateRef.current?.(toPersistedState(advanceRound(state, liveScore)));
+      await onSaveStateRef.current?.(toPersistedState(advanceRound(state, liveScore), currentActiveMs()));
     }
     onRoundComplete?.(nextRound);
     dispatch({ type: 'ADVANCE_ROUND', liveScore });
@@ -575,7 +606,8 @@ export function GameScreen({
       dispatch({ type: 'RESTART' });
       setSelectedTileIds(new Set());
       setOverlayDismissed(false);
-      setPausedMs(0);
+      activeMsRef.current = 0;
+      activeStartRef.current = Date.now();
       setManuallyPaused(false);
     }
   }
