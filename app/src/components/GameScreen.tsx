@@ -198,6 +198,22 @@ export function GameScreen({
     return () => clearTimeout(id);
   }, [state]);
 
+  // Flushes an immediate (non-debounced) save the instant the player stops
+  // actively engaging with this tab — backgrounded, switched to a
+  // different app-tab, or manually paused. Real-world browsers can
+  // discard/reload a backgrounded tab under memory pressure; without this,
+  // whatever the debounced save's last snapshot happened to be could be
+  // several tile-placements stale, so returning to a freshly-reloaded tab
+  // would restore an outdated board — even though the timer (persisted
+  // separately via startTime, unaffected by a reload) looked like it
+  // "resumed" normally, since only the *board* was actually stale. Keyed
+  // on `paused` alone (not `state`), same pattern as the finished-flush
+  // effect below — only meant to fire once, on the transition into paused.
+  useEffect(() => {
+    if (paused) onSaveStateRef.current?.(toPersistedState(state));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paused]);
+
   // Fires immediately (not debounced) the instant the round finishes,
   // racing ahead of the round-complete RPC (DailyChallenge's
   // onRoundComplete) that flips the session to 'completed' server-side —

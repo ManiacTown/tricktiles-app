@@ -19,17 +19,21 @@
 
 /* Three layers, same technique as most "ambient" game backgrounds: a
    repeating decorative texture on top of two large, soft radial-gradient
-   color blobs anchored to opposite corners. Texture here is a handful of
-   scattered, rotated tile-outline squares (a couple with a faint letter)
-   at very low opacity — on-theme for a tile game specifically, rather
-   than a generic dot-grid. All three layers sit behind every real UI
-   element, since nothing here (#root, .card, .profile-panel, etc.) sets
-   its own opaque background beyond what it already needs. */
+   color blobs anchored to opposite corners. Texture here is scattered,
+   rotated tile-outline squares — every one carrying a faint letter this
+   time, not just two — at very low opacity, on-theme for a tile game
+   specifically rather than a generic dot-grid. Each <text> sits at its
+   own tile's exact center with text-anchor:middle + dominant-baseline:
+   central, which centers it precisely regardless of font metrics —
+   more reliable than hand-picked x/y offsets. All three layers sit
+   behind every real UI element, since nothing here (#root, .card,
+   .profile-panel, etc.) sets its own opaque background beyond what it
+   already needs. */
 body {
   margin: 0;
   background-color: var(--bg);
   background-image:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600' viewBox='0 0 600 600'%3E%3Cg fill='none' stroke='rgba(110,144,128,0.10)' stroke-width='3'%3E%3Crect x='30' y='50' width='100' height='100' rx='14' transform='rotate(-10 80 100)'/%3E%3Crect x='420' y='30' width='80' height='80' rx='12' transform='rotate(14 460 70)'/%3E%3Crect x='470' y='430' width='110' height='110' rx='16' transform='rotate(-6 525 485)'/%3E%3Crect x='40' y='440' width='75' height='75' rx='11' transform='rotate(18 77 477)'/%3E%3Crect x='250' y='10' width='55' height='55' rx='9' transform='rotate(8 277 37)'/%3E%3Crect x='10' y='250' width='60' height='60' rx='10' transform='rotate(-14 40 280)'/%3E%3C/g%3E%3Cg fill='rgba(110,144,128,0.09)' font-family='sans-serif' font-weight='800'%3E%3Ctext x='58' y='118' font-size='40' transform='rotate(-10 80 100)'%3ET%3C/text%3E%3Ctext x='500' y='500' font-size='44' transform='rotate(-6 525 485)'%3ES%3C/text%3E%3C/g%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600' viewBox='0 0 600 600'%3E%3Cg fill='none' stroke='rgba(110,144,128,0.10)' stroke-width='3'%3E%3Crect x='30' y='50' width='100' height='100' rx='14' transform='rotate(-10 80 100)'/%3E%3Crect x='420' y='30' width='80' height='80' rx='12' transform='rotate(14 460 70)'/%3E%3Crect x='470' y='430' width='110' height='110' rx='16' transform='rotate(-6 525 485)'/%3E%3Crect x='40' y='440' width='75' height='75' rx='11' transform='rotate(18 77 477)'/%3E%3Crect x='250' y='10' width='55' height='55' rx='9' transform='rotate(8 277 37)'/%3E%3Crect x='10' y='250' width='60' height='60' rx='10' transform='rotate(-14 40 280)'/%3E%3C/g%3E%3Cg fill='rgba(110,144,128,0.11)' font-family='sans-serif' font-weight='800' text-anchor='middle' dominant-baseline='central'%3E%3Ctext x='80' y='100' font-size='46' transform='rotate(-10 80 100)'%3ET%3C/text%3E%3Ctext x='460' y='70' font-size='38' transform='rotate(14 460 70)'%3ER%3C/text%3E%3Ctext x='525' y='485' font-size='50' transform='rotate(-6 525 485)'%3EI%3C/text%3E%3Ctext x='77' y='477' font-size='35' transform='rotate(18 77 477)'%3EC%3C/text%3E%3Ctext x='277' y='37' font-size='26' transform='rotate(8 277 37)'%3EK%3C/text%3E%3Ctext x='40' y='280' font-size='28' transform='rotate(-14 40 280)'%3ES%3C/text%3E%3C/g%3E%3C/svg%3E"),
     radial-gradient(circle at 15% 10%, rgba(110, 144, 128, 0.14), transparent 45%),
     radial-gradient(circle at 85% 90%, rgba(201, 151, 31, 0.12), transparent 50%);
   background-repeat: repeat, no-repeat, no-repeat;

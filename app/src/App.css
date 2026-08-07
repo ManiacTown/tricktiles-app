@@ -11,30 +11,6 @@
   color: var(--accent);
 }
 
-/* Cursor-tracked radial glow for panel-style cards — mirrors Pushdle's
-   own .spotlight class exactly (see lib/spotlight.ts for the JS half).
-   overflow:hidden clips the glow to the card's own rounded corners;
-   z-index:-1 on the ::before keeps it behind the card's real content
-   within the card's own stacking context. */
-.spotlight {
-  position: relative;
-  z-index: 0;
-  overflow: hidden;
-}
-.spotlight::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: radial-gradient(220px circle at var(--mx, 50%) var(--my, 50%), var(--accent-soft), transparent 70%);
-  opacity: 0;
-  transition: opacity 0.35s ease;
-  pointer-events: none;
-}
-.spotlight:hover::before {
-  opacity: 1;
-}
-
 header {
   width: 100%;
   max-width: 660px;
