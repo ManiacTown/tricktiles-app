@@ -232,14 +232,63 @@ export function GameScreen({
 
   const elapsedSeconds = Math.floor(currentActiveMs() / 1000);
 
-  // Debounced auto-save checkpoint: fires ~1s after board/rack/round
-  // settles, rather than on every single tile move. onSaveState is a ref
-  // (not a dep) since DailyChallenge passes a fresh closure each render.
+  // onSaveState is a ref (not a dep of the effects below) since
+  // DailyChallenge passes a fresh closure each render.
   const onSaveStateRef = useRef(onSaveState);
   onSaveStateRef.current = onSaveState;
+
+  // All saves — debounced, heartbeat, flush-on-pause, flush-on-finish,
+  // and the final-round save — funnel through this single serialized,
+  // coalescing queue instead of each firing its own independent fetch.
+  // Without it, several of those triggers can land in-flight at the same
+  // time (a slow/variable connection makes this easy: the 3s heartbeat
+  // alone can overlap a request that's still pending from 3s ago), and
+  // nothing stops their responses from arriving at the server, and being
+  // *applied*, out of order — a slightly-stale request that happens to
+  // land after a newer one silently overwrites it, since every save is an
+  // unconditional PATCH of the whole snapshot. That's what "fragmented
+  // saves" looks like from the outside: progress that was already
+  // persisted appears to unravel for no visible reason. Serializing to at
+  // most one in-flight request at a time makes that reordering
+  // impossible — the server only ever sees writes in the order they were
+  // actually sent. Coalescing (only the latest queued state survives
+  // while one's in flight) means a burst of triggers close together costs
+  // one extra request, not one per trigger.
+  const saveInFlightRef = useRef(false);
+  const pendingSaveRef = useRef<{ state: PersistedGameState; resolvers: (() => void)[] } | null>(null);
+
+  function flushSaveQueue() {
+    if (saveInFlightRef.current || !pendingSaveRef.current) return;
+    const { state: toSave, resolvers } = pendingSaveRef.current;
+    pendingSaveRef.current = null;
+    saveInFlightRef.current = true;
+    Promise.resolve(onSaveStateRef.current?.(toSave))
+      .catch((err) => console.error('Failed to save session state:', err))
+      .finally(() => {
+        saveInFlightRef.current = false;
+        resolvers.forEach((resolve) => resolve());
+        flushSaveQueue();
+      });
+  }
+
+  function requestSave(persisted: PersistedGameState): Promise<void> {
+    if (!onSaveStateRef.current) return Promise.resolve();
+    return new Promise((resolve) => {
+      if (pendingSaveRef.current) {
+        pendingSaveRef.current.state = persisted; // newest snapshot always wins
+        pendingSaveRef.current.resolvers.push(resolve);
+      } else {
+        pendingSaveRef.current = { state: persisted, resolvers: [resolve] };
+      }
+      flushSaveQueue();
+    });
+  }
+
+  // Debounced checkpoint: requests a save ~1s after board/rack/round
+  // settles, rather than on every single tile move.
   useEffect(() => {
     if (!onSaveStateRef.current) return;
-    const id = setTimeout(() => onSaveStateRef.current?.(toPersistedState(state, currentActiveMs())), 1000);
+    const id = setTimeout(() => requestSave(toPersistedState(state, currentActiveMs())), 1000);
     return () => clearTimeout(id);
   }, [state]);
 
@@ -263,7 +312,7 @@ export function GameScreen({
   useEffect(() => {
     if (!onSaveStateRef.current || paused || finished) return;
     const id = setInterval(() => {
-      onSaveStateRef.current?.(toPersistedState(stateRef.current, currentActiveMs()));
+      requestSave(toPersistedState(stateRef.current, currentActiveMs()));
     }, 3000);
     return () => clearInterval(id);
   }, [paused, finished]);
@@ -281,7 +330,7 @@ export function GameScreen({
   // alone (not `state`), same pattern as the finished-flush effect below —
   // only meant to fire once, on the transition into paused.
   useEffect(() => {
-    if (paused) onSaveStateRef.current?.(toPersistedState(state, currentActiveMs()));
+    if (paused) requestSave(toPersistedState(state, currentActiveMs()));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paused]);
 
@@ -297,7 +346,7 @@ export function GameScreen({
   // keyed on `finished` alone (not `state`) — only meant to fire once, on
   // the transition into the finished state.
   useEffect(() => {
-    if (finished) onSaveStateRef.current?.(toPersistedState(state, currentActiveMs()));
+    if (finished) requestSave(toPersistedState(state, currentActiveMs()));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [finished]);
 
@@ -393,7 +442,7 @@ export function GameScreen({
       // dispatch below to take effect on the next render) means its own
       // Date.now() runs a few ms apart from the dispatch's — harmless,
       // since this endTime is only ever used for display, never scoring.
-      await onSaveStateRef.current?.(toPersistedState(advanceRound(state, liveScore), currentActiveMs()));
+      await requestSave(toPersistedState(advanceRound(state, liveScore), currentActiveMs()));
     }
     onRoundComplete?.(nextRound);
     dispatch({ type: 'ADVANCE_ROUND', liveScore });
