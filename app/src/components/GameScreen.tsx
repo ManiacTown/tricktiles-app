@@ -23,6 +23,18 @@ import { validateBoard } from '../game/validator';
 import { scoreRuns } from '../game/scoring';
 import { boardFromSolution, type SolutionCell } from '../game/adminSolve';
 import type { Board as BoardModel, Tile } from '../game/types';
+import { useAuth } from '../supabase/useAuth';
+
+const MIN_ZOOM = 0.6;
+const MAX_ZOOM = 1.8;
+
+function clamp(n: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, n));
+}
+
+function touchDistance(a: Touch, b: Touch) {
+  return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+}
 
 function formatTime(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60);
@@ -124,6 +136,78 @@ export function GameScreen({
   // inside the overlay portal.
   const [activeTileSize, setActiveTileSize] = useState<{ width: number; height: number } | null>(null);
   const [, forceTick] = useState(0);
+
+  // Board+Rack+Controls zoom (see the zoom-wrap render below) — a plain
+  // scale applied to everything below the Hud, driven by the mouse wheel
+  // (only when the player has chosen "Zoom" over "Scroll" in Profile's
+  // config section — see wheelMode below) or a two-finger touch pinch
+  // (always on, since pinch doesn't compete with any other gesture the
+  // way wheel-scroll does). Lifted up here from what used to be Board's
+  // own local zoom state so the rack and controls scale along with the
+  // board instead of only the board ending up a mismatched size relative
+  // to everything else once zoomed.
+  const [zoom, setZoom] = useState(1);
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+  const zoomAreaRef = useRef<HTMLDivElement>(null);
+  const pinchRef = useRef<{ startDistance: number; startZoom: number } | null>(null);
+  // useAuth works the same in both Practice and Daily (AuthProvider wraps
+  // the whole app) — an anonymous Practice player just has no profile, so
+  // wheelMode falls back to 'scroll' (never hijacks the page's own
+  // scrolling for someone who never opted in).
+  const { profile } = useAuth();
+  const wheelMode = profile?.wheel_mode ?? 'scroll';
+  const wheelModeRef = useRef(wheelMode);
+  wheelModeRef.current = wheelMode;
+
+  // Native listeners with { passive: false }, same reasoning as the old
+  // Board-local version: preventDefault is required to actually stop the
+  // page from scrolling once zoom mode wants the wheel instead, and
+  // React's synthetic wheel handler doesn't reliably allow that. Reads
+  // both zoom and wheelMode via refs so the listeners attach once
+  // (empty deps) rather than being torn down/re-added on every change.
+  useEffect(() => {
+    const el = zoomAreaRef.current;
+    if (!el) return;
+
+    function onWheel(e: WheelEvent) {
+      if (wheelModeRef.current !== 'zoom') return; // let the page scroll as normal
+      e.preventDefault();
+      setZoom(clamp(zoomRef.current - e.deltaY * 0.0015, MIN_ZOOM, MAX_ZOOM));
+    }
+
+    function onTouchStart(e: TouchEvent) {
+      if (e.touches.length === 2) {
+        pinchRef.current = {
+          startDistance: touchDistance(e.touches[0], e.touches[1]),
+          startZoom: zoomRef.current,
+        };
+      }
+    }
+
+    function onTouchMove(e: TouchEvent) {
+      if (e.touches.length === 2 && pinchRef.current) {
+        e.preventDefault();
+        const ratio = touchDistance(e.touches[0], e.touches[1]) / pinchRef.current.startDistance;
+        setZoom(clamp(pinchRef.current.startZoom * ratio, MIN_ZOOM, MAX_ZOOM));
+      }
+    }
+
+    function onTouchEnd(e: TouchEvent) {
+      if (e.touches.length < 2) pinchRef.current = null;
+    }
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener('touchstart', onTouchStart, { passive: false });
+    el.addEventListener('touchmove', onTouchMove, { passive: false });
+    el.addEventListener('touchend', onTouchEnd);
+    return () => {
+      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('touchstart', onTouchStart);
+      el.removeEventListener('touchmove', onTouchMove);
+      el.removeEventListener('touchend', onTouchEnd);
+    };
+  }, []);
 
   const finished = state.endTime !== null;
   // Clicking out of the result overlay (or its Exit button) hides it
@@ -696,58 +780,71 @@ export function GameScreen({
         pauseDisabled={finished}
       />
 
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-      >
-        {/* Blurred (not hidden) while manually paused — the letters read as
-            indistinct blobs instead of vanishing outright, which reads
-            better with the Paused card's own fade/pop-in transition than a
-            hard cut to an empty rack did. pointer-events:none is a second
-            line of defense alongside handleDragStart's own paused check. */}
-        <div className={`playfield${manuallyPaused ? ' playfield-blurred' : ''}`}>
-          <Board
-            board={state.board}
-            cellStatus={validation.cellStatus}
-            typingCursor={typingCursor}
-            onHoverCell={(cell) => setTypingCursor(cell)}
-            onDeleteTile={(tileId) => {
-              // Right-click-to-delete bypasses both the keyboard guard and
-              // handleDragStart's own paused/finished check (see those) —
-              // it's wired straight from TileView's onContextMenu, so it
-              // needs its own guard here.
-              if (paused || finished) return;
-              dispatch({ type: 'MOVE_TILE', tileId, to: { kind: 'rack' } });
-            }}
-            selectedTileIds={selectedTileIds}
-            onSelectionChange={(ids) => setSelectedTileIds(new Set(ids))}
-          />
-          <Rack rack={state.rack} />
-        </div>
-        <DragOverlay>
-          {activeTile && activeTileSize ? (
-            <div
-              className="tile drag-overlay"
-              style={{ width: activeTileSize.width, height: activeTileSize.height }}
-            >
-              {activeTile.letter}
-              <span className="pts">{LETTER_VALUES[activeTile.letter]}</span>
+      {/* Board + rack + controls all scale together (see the zoom state
+          above) so the buttons and tiles stay proportional to the board
+          instead of the board zooming on its own and leaving everything
+          else a mismatched size. overflow:auto lives on the OUTER,
+          untransformed wrapper — transform:scale doesn't affect layout
+          size, but a scaled child's visual overflow still contributes to
+          its scrolling ancestor's scrollable region, so this still lets a
+          zoomed-in view be scrolled into view like the board's own
+          zoom-wrap used to. */}
+      <div className="zoom-wrap" ref={zoomAreaRef}>
+        <div className="zoom-scale" style={{ transform: `scale(${zoom})` }}>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+            {/* Blurred (not hidden) while manually paused — the letters read as
+                indistinct blobs instead of vanishing outright, which reads
+                better with the Paused card's own fade/pop-in transition than a
+                hard cut to an empty rack did. pointer-events:none is a second
+                line of defense alongside handleDragStart's own paused check. */}
+            <div className={`playfield${manuallyPaused ? ' playfield-blurred' : ''}`}>
+              <Board
+                board={state.board}
+                cellStatus={validation.cellStatus}
+                typingCursor={typingCursor}
+                onHoverCell={(cell) => setTypingCursor(cell)}
+                onDeleteTile={(tileId) => {
+                  // Right-click-to-delete bypasses both the keyboard guard and
+                  // handleDragStart's own paused/finished check (see those) —
+                  // it's wired straight from TileView's onContextMenu, so it
+                  // needs its own guard here.
+                  if (paused || finished) return;
+                  dispatch({ type: 'MOVE_TILE', tileId, to: { kind: 'rack' } });
+                }}
+                selectedTileIds={selectedTileIds}
+                onSelectionChange={(ids) => setSelectedTileIds(new Set(ids))}
+              />
+              <Rack rack={state.rack} />
             </div>
-          ) : null}
-        </DragOverlay>
-      </DndContext>
+            <DragOverlay>
+              {activeTile && activeTileSize ? (
+                <div
+                  className="tile drag-overlay"
+                  style={{ width: activeTileSize.width, height: activeTileSize.height }}
+                >
+                  {activeTile.letter}
+                  <span className="pts">{LETTER_VALUES[activeTile.letter]}</span>
+                </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
 
-      <Controls
-        onShift={handleShiftBoard}
-        onUndo={() => dispatch({ type: 'UNDO' })}
-        onNext={handleCompleteRound}
-        canUndo={state.history.length > 0}
-        ready={validation.complete}
-        isLastRound={isLastRound}
-        disabled={finished || paused}
-      />
+          <Controls
+            onShift={handleShiftBoard}
+            onUndo={() => dispatch({ type: 'UNDO' })}
+            onNext={handleCompleteRound}
+            canUndo={state.history.length > 0}
+            ready={validation.complete}
+            isLastRound={isLastRound}
+            disabled={finished || paused}
+          />
+        </div>
+      </div>
 
       <div className="status">
         {finished

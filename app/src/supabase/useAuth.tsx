@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from './client';
-import type { ProfileRow } from './types';
+import type { ProfileRow, WheelMode } from './types';
 
 interface AuthState {
   loading: boolean;
@@ -14,6 +14,7 @@ interface AuthContextValue extends AuthState {
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateSelectedEmoji: (emoji: string | null) => Promise<void>;
+  updateWheelMode: (mode: WheelMode) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -129,8 +130,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState((prev) => (prev.profile ? { ...prev, profile: { ...prev.profile, selected_emoji: emoji } } : prev));
   }
 
+  // Same update-then-patch-local-state pattern as updateSelectedEmoji
+  // above — every consumer (GameScreen in both tabs, Profile) shares one
+  // AuthContext instance, so this takes effect immediately everywhere
+  // without needing a refetch.
+  async function updateWheelMode(mode: WheelMode): Promise<void> {
+    if (!state.session) return;
+    const { error } = await supabase.from('profiles').update({ wheel_mode: mode }).eq('id', state.session.user.id);
+    if (error) throw error;
+    setState((prev) => (prev.profile ? { ...prev, profile: { ...prev.profile, wheel_mode: mode } } : prev));
+  }
+
   return (
-    <AuthContext.Provider value={{ ...state, signUp, signIn, signOut, updateSelectedEmoji }}>
+    <AuthContext.Provider value={{ ...state, signUp, signIn, signOut, updateSelectedEmoji, updateWheelMode }}>
       {children}
     </AuthContext.Provider>
   );

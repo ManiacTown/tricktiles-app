@@ -22,6 +22,8 @@ export interface GameSessionRow {
   final_board_state: unknown | null;
 }
 
+export type WheelMode = 'scroll' | 'zoom';
+
 export interface ProfileRow {
   id: string;
   username: string;
@@ -30,6 +32,10 @@ export interface ProfileRow {
   // means none selected. Allowed values are DB-enforced (a check
   // constraint listing every rare+ badge's icon), not just client-side.
   selected_emoji: string | null;
+  // Whether scrolling the mouse wheel over the board/rack/controls
+  // scrolls the page ('scroll', default) or zooms them ('zoom'). See
+  // GameScreen's zoom-wrap wheel handler.
+  wheel_mode: WheelMode;
 }
 
 export type BadgeRarity = 'common' | 'rare' | 'legendary' | 'special';

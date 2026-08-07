@@ -72,11 +72,33 @@ h1 {
   padding: 0;
 }
 
+/* The outer, untransformed scroll boundary for the whole zoomable area
+   (board + rack + controls — see .zoom-scale below). overflow:auto here
+   (not on .zoom-scale itself) means the box used for scroll-region
+   calculations never itself changes size, while a scaled-up child's
+   visual overflow still contributes to it, so zooming in still leaves a
+   way to scroll the rest into view. */
+.zoom-wrap {
+  width: 100%;
+  max-width: 660px;
+  overflow: auto;
+}
+/* The actual scaled element (see GameScreen's zoom state) — everything
+   below the Hud scales together so the rack/controls stay proportional
+   to the board instead of the board zooming on its own. 50% 0% keeps the
+   top edge stable as it grows/shrinks rather than the whole thing
+   drifting off-center. */
+.zoom-scale {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  transform-origin: 50% 0%;
+}
+
 /* Wraps the board + rack so pausing can blur both together in one filter
    (rather than the board and rack separately drifting out of sync) while
-   the Hud/Controls/status text around it stay sharp and readable. Mirrors
-   .tab-panel's own centering since it now sits between .tab-panel and
-   .board-zoom-wrap/#rackWrap in the DOM. */
+   the Hud/Controls/status text around it stay sharp and readable. */
 .playfield {
   display: flex;
   flex-direction: column;
@@ -94,12 +116,6 @@ h1 {
   }
 }
 
-.board-zoom-wrap {
-  width: 100%;
-  max-width: 660px;
-  overflow: auto;
-  border-radius: 16px;
-}
 #board {
   display: grid;
   grid-template-columns: repeat(13, minmax(0, 1fr));
@@ -108,7 +124,7 @@ h1 {
   padding: 14px;
   border-radius: 16px;
   width: 100%;
-  transform-origin: 50% 0%;
+  max-width: 660px;
   /* Otherwise a real mouse click-drag over empty board space starts a
      native text/content selection instead of the marquee-select
      gesture. */
@@ -415,6 +431,11 @@ button:disabled {
   justify-content: center;
   z-index: 10;
   padding: 20px;
+  /* Flexbox centers an over-tall child by overflowing equally past both
+     the top and bottom of the container with no way to reach the rest —
+     overflow-y here means a card taller than the viewport can still be
+     scrolled into full view instead of just getting clipped. */
+  overflow-y: auto;
 }
 .modal-backdrop.show {
   display: flex;
@@ -550,12 +571,37 @@ button:disabled {
   padding: 40px 36px;
   text-align: center;
   min-width: 280px;
+  /* Without this, the h2 inherits .stamp's display:inline-block (meant
+     for titles that sit inline with other text elsewhere) and the
+     Resume button right after it — also inline-level by default — ends
+     up sharing the same line instead of stacking below it, visually
+     colliding with the "Paused" text instead of the two being spaced
+     apart the way the h2's own margin-bottom intends. */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* Same defensive sizing .result-card already had — without it, a card
+     this size on a short or narrow viewport (a phone in landscape, a
+     desktop window with dev tools docked at the bottom) can collide with
+     — overflow past — the edges of the screen, since flexbox centering
+     alone doesn't shrink an oversized child to fit. */
+  max-width: min(90vw, 360px);
+  max-height: 85vh;
+  overflow-y: auto;
+  box-sizing: border-box;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25);
   animation: resultPopIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 @media (prefers-reduced-motion: reduce) {
   .pause-card {
     animation: none;
+  }
+}
+@media (max-width: 480px) {
+  .pause-card {
+    padding: 28px 20px;
+    min-width: 0;
+    width: 100%;
   }
 }
 .pause-card h2 {
@@ -649,6 +695,77 @@ button:disabled {
   text-transform: uppercase;
   color: var(--ink-soft);
   margin-top: 6px;
+}
+
+.small {
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+/* Profile's Config section — a labeled row with a small segmented
+   control on the end, one row per setting (currently just the mouse
+   wheel scroll/zoom choice, room for more later without restructuring). */
+.config-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.config-row-label {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+.config-toggle {
+  display: flex;
+  background: var(--board-bg);
+  border-radius: 10px;
+  padding: 3px;
+  gap: 3px;
+  flex-shrink: 0;
+}
+.config-toggle button {
+  background: transparent;
+  color: var(--ink-soft);
+  padding: 7px 16px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+.config-toggle button.active {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+/* Profile's Controls section — two small reference tables (mouse,
+   keyboard), each row an action/description pair. Mirrors
+   .result-rounds' own left-label / right-detail table convention. */
+.controls-list-label {
+  font-size: 10px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  margin-bottom: 6px;
+}
+.controls-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 12px;
+}
+.controls-table td {
+  padding: 7px 0;
+  border-top: 1px solid var(--border);
+  vertical-align: top;
+}
+.controls-table tr:first-child td {
+  border-top: none;
+}
+.controls-action {
+  width: 38%;
+  font-weight: 600;
+  padding-right: 12px;
+  color: var(--ink);
 }
 
 /* Badges page — a grid of category "containers" (Pushdle's own term for
