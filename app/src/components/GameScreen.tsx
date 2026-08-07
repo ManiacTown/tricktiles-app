@@ -159,6 +159,19 @@ export function GameScreen({
   const wheelMode = profile?.wheel_mode ?? 'scroll';
   const wheelModeRef = useRef(wheelMode);
   wheelModeRef.current = wheelMode;
+  // Set synchronously in handleDragStart/handleDragEnd below (not derived
+  // from activeTileId React state, which updates a render late) — a
+  // scale change on .zoom-scale WHILE dnd-kit has an active drag in
+  // flight is what actually broke dragging: dnd-kit measures/caches
+  // droppable cell rects during the drag, and changing the ancestor's
+  // transform mid-gesture (e.g. a single stray wheel tick from a
+  // trackpad or a scroll-wheel mouse during what's meant to be a plain
+  // click-drag — very easy to trigger by accident, not a deliberate
+  // zoom) shifts every cell out from under those cached rects, so the
+  // drop resolves against stale positions instead of where things
+  // visually are. Freezing zoom for the duration of any drag removes
+  // that whole failure mode regardless of wheelMode.
+  const isDraggingRef = useRef(false);
 
   // Native listeners with { passive: false }, same reasoning as the old
   // Board-local version: preventDefault is required to actually stop the
@@ -171,12 +184,14 @@ export function GameScreen({
     if (!el) return;
 
     function onWheel(e: WheelEvent) {
+      if (isDraggingRef.current) return; // never rescale mid-drag — see isDraggingRef's comment
       if (wheelModeRef.current !== 'zoom') return; // let the page scroll as normal
       e.preventDefault();
       setZoom(clamp(zoomRef.current - e.deltaY * 0.0015, MIN_ZOOM, MAX_ZOOM));
     }
 
     function onTouchStart(e: TouchEvent) {
+      if (isDraggingRef.current) return;
       if (e.touches.length === 2) {
         pinchRef.current = {
           startDistance: touchDistance(e.touches[0], e.touches[1]),
@@ -186,6 +201,7 @@ export function GameScreen({
     }
 
     function onTouchMove(e: TouchEvent) {
+      if (isDraggingRef.current) return;
       if (e.touches.length === 2 && pinchRef.current) {
         e.preventDefault();
         const ratio = touchDistance(e.touches[0], e.touches[1]) / pinchRef.current.startDistance;
@@ -678,6 +694,7 @@ export function GameScreen({
     // dismissible underneath the result screen), so without this a player
     // could still drag their already-submitted board's tiles around.
     if (paused || finished) return;
+    isDraggingRef.current = true;
     setActiveTileId(event.active.id as string);
     // Measured directly from the DOM via the tile's data-tile-id rather
     // than dnd-kit's own rect.current.initial — with a small activation
@@ -693,6 +710,7 @@ export function GameScreen({
   }
 
   function handleDragEnd(event: DragEndEvent) {
+    isDraggingRef.current = false;
     setActiveTileId(null);
     setActiveTileSize(null);
     // dnd-kit's own drag machinery (useDraggable's listeners, wired
