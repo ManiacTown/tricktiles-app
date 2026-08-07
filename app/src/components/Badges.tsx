@@ -3,6 +3,7 @@ import { useAuth } from '../supabase/useAuth';
 import { getBadges, getUnlockedBadgeIds } from '../supabase/api';
 import type { BadgeRarity, BadgeRow } from '../supabase/types';
 import { SignIn } from './SignIn';
+import { spotlightMove } from '../lib/spotlight';
 
 // Mirrors Pushdle's own RARITY_META (src/lib/game.js) — same four tiers,
 // recolored to fit Tricktiles' light theme instead of Pushdle's dark one.
@@ -109,7 +110,7 @@ export function Badges() {
 
       <div className="badge-categories">
         {[...categories.entries()].map(([category, categoryBadges]) => (
-          <div className="badge-container" key={category}>
+          <div className="badge-container spotlight" onMouseMove={spotlightMove} key={category}>
             <h3>{category}</h3>
             <div className="badge-list">
               {categoryBadges.map((badge) => {

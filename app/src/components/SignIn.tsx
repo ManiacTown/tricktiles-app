@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { spotlightMove } from '../lib/spotlight';
 
 interface SignInProps {
   onSignUp: (email: string, password: string, username: string) => Promise<{ needsEmailConfirmation: boolean }>;
@@ -65,7 +66,7 @@ export function SignIn({ onSignUp, onSignIn }: SignInProps) {
 
   if (checkEmail) {
     return (
-      <div className="card" style={{ margin: '40px auto' }}>
+      <div className="card spotlight" onMouseMove={spotlightMove} style={{ margin: '40px auto' }}>
         <h2 className="stamp">CHECK YOUR EMAIL</h2>
         <p className="small" style={{ margin: '8px 0 0' }}>
           We sent a confirmation link to {email.trim()}. Click it, then come back and log in.
@@ -75,7 +76,7 @@ export function SignIn({ onSignUp, onSignIn }: SignInProps) {
   }
 
   return (
-    <div className="card" style={{ margin: '40px auto' }}>
+    <div className="card spotlight" onMouseMove={spotlightMove} style={{ margin: '40px auto' }}>
       <h2 className="stamp">{mode === 'signup' ? 'CREATE ACCOUNT' : 'LOG IN'}</h2>
       <p className="small" style={{ margin: '8px 0 16px' }}>
         {mode === 'signup'

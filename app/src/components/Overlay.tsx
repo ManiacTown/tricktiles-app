@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { buildShareText } from '../game/shareText';
+import { spotlightMove } from '../lib/spotlight';
 
 interface RoundSummary {
   round: number;
@@ -79,7 +80,7 @@ export function Overlay({ show, finalTime, finalScore, rounds, puzzleNumber, onE
         if (e.target === e.currentTarget) onExit();
       }}
     >
-      <div className="result-card">
+      <div className="result-card spotlight" onMouseMove={spotlightMove}>
         <div className="stamp result-wordmark">TRICKTILES</div>
         {puzzleNumber != null && <div className="result-puzzle-number">Daily Puzzle #{puzzleNumber}</div>}
         <h2 className="stamp result-title">Solved!</h2>

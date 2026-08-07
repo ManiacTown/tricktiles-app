@@ -3,6 +3,7 @@ import { useAuth } from '../supabase/useAuth';
 import { getTodayPuzzle, getLeaderboard } from '../supabase/api';
 import type { LeaderboardRow } from '../supabase/types';
 import { SignIn } from './SignIn';
+import { spotlightMove } from '../lib/spotlight';
 
 function formatTime(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60);
@@ -71,7 +72,7 @@ export function Leaderboard() {
       )}
 
       {rows.length > 0 && (
-        <div className="profile-panel">
+        <div className="profile-panel spotlight" onMouseMove={spotlightMove}>
           {myRank >= 0 && <div className="leaderboard-you-banner">You are rank #{myRank + 1}</div>}
           <div className="leaderboard-list">
             {rows.map((row, i) => {

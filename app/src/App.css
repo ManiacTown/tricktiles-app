@@ -1,6 +1,38 @@
 .stamp {
+  display: inline-block;
   font-weight: 800;
   letter-spacing: 0.02em;
+  transition:
+    transform 0.2s ease,
+    color 0.2s ease;
+}
+.stamp:hover {
+  transform: scale(1.045);
+  color: var(--accent);
+}
+
+/* Cursor-tracked radial glow for panel-style cards — mirrors Pushdle's
+   own .spotlight class exactly (see lib/spotlight.ts for the JS half).
+   overflow:hidden clips the glow to the card's own rounded corners;
+   z-index:-1 on the ::before keeps it behind the card's real content
+   within the card's own stacking context. */
+.spotlight {
+  position: relative;
+  z-index: 0;
+  overflow: hidden;
+}
+.spotlight::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(220px circle at var(--mx, 50%) var(--my, 50%), var(--accent-soft), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+}
+.spotlight:hover::before {
+  opacity: 1;
 }
 
 header {
@@ -262,9 +294,17 @@ button {
   transition:
     transform 0.1s,
     opacity 0.2s,
-    background 0.15s;
+    background 0.15s,
+    border-color 0.15s,
+    box-shadow 0.15s;
 }
-button:active {
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+/* Same specificity as the hover rule above (two pseudo-classes each) and
+   declared after it, so a real click — hover + active firing together —
+   resolves to the press-down bounce, not the hover lift, on the tie. */
+button:active:not(:disabled) {
   transform: scale(0.97);
 }
 button:disabled {
@@ -337,6 +377,10 @@ button:disabled {
   background: var(--surface);
   color: var(--ink);
   border: 1px solid var(--border);
+}
+.mode-tab:hover:not(.active) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 .mode-tab.active {
   background: var(--accent);
@@ -674,24 +718,26 @@ button:disabled {
   border: 1px solid var(--border);
   background: var(--board-bg);
   opacity: 0.55;
+  transition:
+    transform 0.15s,
+    box-shadow 0.15s,
+    opacity 0.15s;
+}
+/* Every card gets the hover feedback (matches Pushdle's own
+   .badge-card:hover, which doesn't gate on interactivity either) —
+   locked/non-flair-eligible cards just aren't clickable, cursor:pointer
+   below is scoped to the ones that are. */
+.badge-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
 }
 .badge-card-earned {
   opacity: 1;
   border-color: var(--rarity-color, var(--accent));
   background: var(--accent-soft);
 }
-/* Flair-eligible earned badges (rare+) are clickable — cursor + a subtle
-   lift on hover signals that, matching Pushdle's own clickable-badge-card
-   affordance. */
 .badge-card[role='button'] {
   cursor: pointer;
-  transition:
-    transform 0.1s,
-    box-shadow 0.15s;
-}
-.badge-card[role='button']:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
 }
 .badge-card-selected {
   border-width: 2px;
@@ -770,6 +816,13 @@ button:disabled {
   transition:
     transform 0.15s,
     filter 0.15s;
+}
+/* Slide + a light brighten — a lighter touch than Pushdle's own
+   translateX(4px) + brightness(1.2), which would read as washed-out on a
+   light background instead of the glow it reads as on Pushdle's dark one. */
+.leaderboard-row:hover {
+  transform: translateX(4px);
+  filter: brightness(1.03);
 }
 .leaderboard-row-me {
   border-color: var(--accent);

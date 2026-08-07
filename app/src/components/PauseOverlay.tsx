@@ -1,3 +1,5 @@
+import { spotlightMove } from '../lib/spotlight';
+
 interface PauseOverlayProps {
   show: boolean;
   onResume: () => void;
@@ -14,7 +16,7 @@ export function PauseOverlay({ show, onResume }: PauseOverlayProps) {
         if (e.target === e.currentTarget) onResume();
       }}
     >
-      <div className="pause-card">
+      <div className="pause-card spotlight" onMouseMove={spotlightMove}>
         <h2 className="stamp">Paused</h2>
         <button onClick={onResume}>Resume</button>
       </div>

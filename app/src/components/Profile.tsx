@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../supabase/useAuth';
 import { getProfileStats, type ProfileStats } from '../supabase/api';
 import { SignIn } from './SignIn';
+import { spotlightMove } from '../lib/spotlight';
 
 function formatTime(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60);
@@ -64,7 +65,7 @@ export function Profile() {
         </button>
       </div>
 
-      <div className="profile-panel">
+      <div className="profile-panel spotlight" onMouseMove={spotlightMove}>
         <h3>Stats</h3>
 
         {error && <div style={{ color: 'var(--invalid)', fontSize: '12px' }}>{error}</div>}
