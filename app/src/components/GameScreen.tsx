@@ -243,6 +243,31 @@ export function GameScreen({
     return () => clearTimeout(id);
   }, [state]);
 
+  // Periodic heartbeat, independent of the debounce above: every few
+  // seconds while genuinely active, regardless of whether the board/rack
+  // actually changed. Two real reports this was missing: (1) a player who
+  // sits thinking without moving a tile for a while, then reloads, sees
+  // the timer jump backward to whatever the last *edit*-triggered save
+  // happened to be, since nothing else was checkpointing activeMs in the
+  // meantime; (2) finishing a round and switching tabs within roughly a
+  // second could lose that round's progress if the flush-on-pause save
+  // below lost its race with the tab actually being discarded before the
+  // request landed. A save this stale is never more than ~3s stale to
+  // begin with, so either failure mode now costs a few seconds at worst
+  // instead of however long since the last real edit. Reads `state` via a
+  // ref rather than depending on it directly so the interval doesn't
+  // restart (and its own 3s clock reset) on every tile move — the
+  // debounced save above already covers the "just edited" case well.
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  useEffect(() => {
+    if (!onSaveStateRef.current || paused || finished) return;
+    const id = setInterval(() => {
+      onSaveStateRef.current?.(toPersistedState(stateRef.current, currentActiveMs()));
+    }, 3000);
+    return () => clearInterval(id);
+  }, [paused, finished]);
+
   // Flushes an immediate (non-debounced) save the instant the player stops
   // actively engaging with this tab — backgrounded, switched to a
   // different app-tab, or manually paused. Real-world browsers can
