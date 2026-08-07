@@ -142,13 +142,28 @@ export function GameScreen({
   // minutes to Daily's timer. Deliberately invisible/seamless (no modal) —
   // unlike manuallyPaused below, there's no one to see a modal on a
   // backgrounded or hidden tab anyway.
-  const [tabHidden, setTabHidden] = useState(() => document.visibilityState === 'hidden');
+  //
+  // Two independent signals, not just visibilitychange: switching to a
+  // different browser tab always changes window focus even on the rare
+  // occasion visibilitychange itself doesn't fire promptly (browser/OS
+  // dependent), so window blur/focus is a genuine second line of defense
+  // here, not a redundant one — this treats "tab not visible" OR "window
+  // doesn't have focus" as equally meaning "not being looked at."
+  const [tabHidden, setTabHidden] = useState(
+    () => document.visibilityState === 'hidden' || !document.hasFocus(),
+  );
   useEffect(() => {
-    function onVisibilityChange() {
-      setTabHidden(document.visibilityState === 'hidden');
+    function updateTabHidden() {
+      setTabHidden(document.visibilityState === 'hidden' || !document.hasFocus());
     }
-    document.addEventListener('visibilitychange', onVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', onVisibilityChange);
+    document.addEventListener('visibilitychange', updateTabHidden);
+    window.addEventListener('blur', updateTabHidden);
+    window.addEventListener('focus', updateTabHidden);
+    return () => {
+      document.removeEventListener('visibilitychange', updateTabHidden);
+      window.removeEventListener('blur', updateTabHidden);
+      window.removeEventListener('focus', updateTabHidden);
+    };
   }, []);
 
   // The explicit Pause button (see Hud) — shows the Paused modal, covers
