@@ -796,6 +796,17 @@ export function GameScreen({
             collisionDetection={closestCenter}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
+            // dnd-kit auto-scrolls the nearest scrollable ancestor of the
+            // dragged tile by default. Before the zoom-wrap change, board
+            // tiles' nearest scrollable ancestor was the small
+            // board-only wrapper and rack tiles had none at all; now both
+            // sit inside .zoom-wrap (needs overflow:auto so a zoomed-in
+            // board can still be scrolled into view — see its own
+            // comment), so dnd-kit started auto-scrolling that container
+            // during ordinary drags. That's the page-scroll-during-drag
+            // behavior explicitly not wanted here, and disabling it also
+            // clears up drags that stopped landing correctly.
+            autoScroll={false}
           >
             {/* Blurred (not hidden) while manually paused — the letters read as
                 indistinct blobs instead of vanishing outright, which reads
