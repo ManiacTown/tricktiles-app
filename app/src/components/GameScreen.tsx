@@ -807,25 +807,25 @@ export function GameScreen({
           its scrolling ancestor's scrollable region, so this still lets a
           zoomed-in view be scrolled into view like the board's own
           zoom-wrap used to. */}
-      <div className="zoom-wrap" ref={zoomAreaRef}>
-        <div className="zoom-scale" style={{ transform: `scale(${zoom})` }}>
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-            // dnd-kit auto-scrolls the nearest scrollable ancestor of the
-            // dragged tile by default. Before the zoom-wrap change, board
-            // tiles' nearest scrollable ancestor was the small
-            // board-only wrapper and rack tiles had none at all; now both
-            // sit inside .zoom-wrap (needs overflow:auto so a zoomed-in
-            // board can still be scrolled into view — see its own
-            // comment), so dnd-kit started auto-scrolling that container
-            // during ordinary drags. That's the page-scroll-during-drag
-            // behavior explicitly not wanted here, and disabling it also
-            // clears up drags that stopped landing correctly.
-            autoScroll={false}
-          >
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        // dnd-kit auto-scrolls the nearest scrollable ancestor of the
+        // dragged tile by default. Before the zoom-wrap change, board
+        // tiles' nearest scrollable ancestor was the small
+        // board-only wrapper and rack tiles had none at all; now both
+        // sit inside .zoom-wrap (needs overflow:auto so a zoomed-in
+        // board can still be scrolled into view — see its own
+        // comment), so dnd-kit started auto-scrolling that container
+        // during ordinary drags. That's the page-scroll-during-drag
+        // behavior explicitly not wanted here, and disabling it also
+        // clears up drags that stopped landing correctly.
+        autoScroll={false}
+      >
+        <div className="zoom-wrap" ref={zoomAreaRef}>
+          <div className="zoom-scale" style={{ transform: `scale(${zoom})` }}>
             {/* Blurred (not hidden) while manually paused — the letters read as
                 indistinct blobs instead of vanishing outright, which reads
                 better with the Paused card's own fade/pop-in transition than a
@@ -850,30 +850,45 @@ export function GameScreen({
               />
               <Rack rack={state.rack} />
             </div>
-            <DragOverlay>
-              {activeTile && activeTileSize ? (
-                <div
-                  className="tile drag-overlay"
-                  style={{ width: activeTileSize.width, height: activeTileSize.height }}
-                >
-                  {activeTile.letter}
-                  <span className="pts">{LETTER_VALUES[activeTile.letter]}</span>
-                </div>
-              ) : null}
-            </DragOverlay>
-          </DndContext>
 
-          <Controls
-            onShift={handleShiftBoard}
-            onUndo={() => dispatch({ type: 'UNDO' })}
-            onNext={handleCompleteRound}
-            canUndo={state.history.length > 0}
-            ready={validation.complete}
-            isLastRound={isLastRound}
-            disabled={finished || paused}
-          />
+            <Controls
+              onShift={handleShiftBoard}
+              onUndo={() => dispatch({ type: 'UNDO' })}
+              onNext={handleCompleteRound}
+              canUndo={state.history.length > 0}
+              ready={validation.complete}
+              isLastRound={isLastRound}
+              disabled={finished || paused}
+            />
+          </div>
         </div>
-      </div>
+
+        {/* Deliberately OUTSIDE .zoom-wrap/.zoom-scale, even though it's
+            still inside DndContext (a React-tree relationship, not a DOM
+            one — this is fine). dnd-kit's DragOverlay clone positions
+            itself with CSS position:fixed to track the cursor, which
+            needs the real VIEWPORT as its containing block. Any CSS
+            transform on an ancestor — including transform:scale(1),
+            mathematically a no-op but still a non-'none' transform value
+            — creates a NEW containing block for position:fixed
+            descendants per spec. Nesting DragOverlay inside .zoom-scale
+            (which always has a transform, even at 1x) was silently
+            reinterpreting its "fixed" coordinates relative to
+            .zoom-scale's own box instead of the viewport, which is why
+            a dragged tile rendered somewhere near its original position
+            instead of following the cursor. */}
+        <DragOverlay>
+          {activeTile && activeTileSize ? (
+            <div
+              className="tile drag-overlay"
+              style={{ width: activeTileSize.width, height: activeTileSize.height }}
+            >
+              {activeTile.letter}
+              <span className="pts">{LETTER_VALUES[activeTile.letter]}</span>
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
 
       <div className="status">
         {finished
