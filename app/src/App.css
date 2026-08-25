@@ -20,6 +20,29 @@ header {
   margin-bottom: 8px;
   text-align: center;
 }
+.footer {
+  width: 100%;
+  max-width: 660px;
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 24px;
+  padding: 16px 0;
+  text-align: center;
+}
+.footer button {
+  background: transparent;
+  color: var(--ink-soft);
+  padding: 4px 0;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.footer button:hover:not(:disabled) {
+  color: var(--accent);
+  transform: none;
+}
 h1 {
   font-size: 24px;
   letter-spacing: -0.01em;
@@ -473,6 +496,29 @@ button:disabled {
   display: flex;
   flex-direction: column;
   animation: resultPopIn 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Footer's About/Privacy/Terms/Updates modal — unlike .result-card above,
+   this holds paragraphs of real prose, so it's narrower and left-aligned
+   for readability instead of wide and centered. */
+.legal-card {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 32px 28px;
+  text-align: left;
+  width: 90vw;
+  max-width: 520px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25);
+  animation: resultPopIn 0.32s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.legal-card p,
+.legal-card li {
+  font-size: 14px;
+  line-height: 1.6;
 }
 @keyframes resultPopIn {
   from {

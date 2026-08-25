@@ -5,6 +5,7 @@ import { DailyChallenge } from './components/DailyChallenge';
 import { Profile } from './components/Profile';
 import { Badges } from './components/Badges';
 import { Leaderboard } from './components/Leaderboard';
+import { Footer } from './components/Footer';
 
 type Mode = 'daily' | 'practice' | 'profile' | 'badges' | 'leaderboard';
 
@@ -134,6 +135,8 @@ function App() {
       >
         <Leaderboard />
       </div>
+
+      <Footer />
     </>
   );
 }
