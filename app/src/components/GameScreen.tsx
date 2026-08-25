@@ -24,6 +24,7 @@ import { scoreRuns } from '../game/scoring';
 import { boardFromSolution, type SolutionCell } from '../game/adminSolve';
 import type { Board as BoardModel, Tile } from '../game/types';
 import { useAuth } from '../supabase/useAuth';
+import { playSound } from '../sound';
 
 const MIN_ZOOM = 0.6;
 const MAX_ZOOM = 1.8;
@@ -521,11 +522,13 @@ export function GameScreen({
 
   async function handleCompleteRound() {
     if (!validation.complete) {
+      playSound('error');
       setNotReadyMessage(NOT_READY_MESSAGES[Math.floor(Math.random() * NOT_READY_MESSAGES.length)]);
       return;
     }
     const nextRound = state.round + 1;
     const willFinish = nextRound >= ROUNDS;
+    playSound(willFinish ? 'puzzleComplete' : 'roundComplete');
 
     if (willFinish) {
       // Save the truly-finished state BEFORE telling the server this
@@ -727,6 +730,7 @@ export function GameScreen({
     const overId = over.id as string;
 
     if (overId === 'rack') {
+      playSound('place');
       dispatch({ type: 'MOVE_TILE', tileId, to: { kind: 'rack' } });
       return;
     }
@@ -751,12 +755,14 @@ export function GameScreen({
         const dr = targetR - origin.r;
         const dc = targetC - origin.c;
         if (dr !== 0 || dc !== 0) {
+          playSound('place');
           dispatch({ type: 'MOVE_GROUP', tileIds: Array.from(selected), dr, dc });
         }
         return;
       }
     }
 
+    playSound('place');
     dispatch({ type: 'MOVE_TILE', tileId, to: { kind: 'board', r: targetR, c: targetC } });
   }
 

@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { ROUNDS } from '../game/rounds';
+import { isSoundMuted, setSoundMuted } from '../sound';
 
 interface HudProps {
   round: number;
@@ -15,6 +17,14 @@ function formatTime(totalSeconds: number): string {
 }
 
 export function Hud({ round, elapsedSeconds, score, onPause, pauseDisabled }: HudProps) {
+  const [muted, setMuted] = useState(isSoundMuted());
+
+  function toggleMuted() {
+    const next = !muted;
+    setMuted(next);
+    setSoundMuted(next);
+  }
+
   return (
     <div className="hud">
       <div className="hud-item">
@@ -31,6 +41,9 @@ export function Hud({ round, elapsedSeconds, score, onPause, pauseDisabled }: Hu
         <div className="hud-label">Score</div>
         <div className="hud-value">{score}</div>
       </div>
+      <button className="hud-pause-btn" onClick={toggleMuted} aria-label={muted ? 'Unmute' : 'Mute'}>
+        {muted ? '🔇' : '🔊'}
+      </button>
       <button className="hud-pause-btn" onClick={onPause} disabled={pauseDisabled} aria-label="Pause">
         ⏸
       </button>
