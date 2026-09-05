@@ -12,7 +12,7 @@ var LetterBag = map[byte]int{
 
 // Deals is the fixed per-round tile count sequence — section 0 locked fixed
 // (not difficulty-scaled) pacing so every player faces the same deals.
-var Deals = [4]int{10, 8, 8, 6}
+var Deals = [4]int{9, 7, 7, 5}
 
 // letterOrder fixes an iteration order over LetterBag (A-Z) so Pool is
 // deterministic — ranging over the map directly isn't, since Go

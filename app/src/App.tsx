@@ -64,6 +64,16 @@ function App() {
     );
   }, [mode]);
 
+  // Only the Daily/Practice tabs need to fit the viewport with no page
+  // scroll (the board/rack/controls layout) — Profile/Badges/Leaderboard
+  // keep normal scrolling. This class is the single on/off switch the CSS
+  // height-capping rules key off of, toggled before paint so there's no
+  // flash of the wrong layout when switching tabs.
+  useLayoutEffect(() => {
+    const isGameTab = mode === 'daily' || mode === 'practice';
+    document.body.classList.toggle('game-tab-active', isGameTab);
+  }, [mode]);
+
   return (
     <>
       <header>

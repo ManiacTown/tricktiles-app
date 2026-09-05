@@ -1,5 +1,4 @@
-import { createBoard, getRuns } from './board';
-import { scoreRuns } from './scoring';
+import { createBoard } from './board';
 import { ROWS, COLS } from './rounds';
 import type { Board } from './types';
 
@@ -11,11 +10,11 @@ export interface SolutionCell {
 
 // Translates a solver-space solution (its coordinates can be negative or
 // otherwise outside 0..ROWS/COLS — the solver isn't bound to a fixed grid)
-// into the client's fixed board, centering it, and scores the result.
-// Returns null if the solution's bounding box doesn't fit the board —
-// shouldn't happen given real puzzle sizes vs. a 13x13 board, but checked
-// rather than silently corrupting placement.
-export function boardFromSolution(cells: SolutionCell[]): { board: Board; score: number } | null {
+// into the client's fixed board, centering it. Returns null if the
+// solution's bounding box doesn't fit the board — shouldn't happen given
+// real puzzle sizes vs. an 11x11 board, but checked rather than silently
+// corrupting placement.
+export function boardFromSolution(cells: SolutionCell[]): { board: Board } | null {
   if (cells.length === 0) return null;
 
   const rows = cells.map((c) => c.r);
@@ -37,6 +36,5 @@ export function boardFromSolution(cells: SolutionCell[]): { board: Board; score:
     board[cell.r + offsetR][cell.c + offsetC] = { id: crypto.randomUUID(), letter: cell.letter };
   }
 
-  const score = scoreRuns(getRuns(board), board);
-  return { board, score };
+  return { board };
 }

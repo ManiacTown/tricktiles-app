@@ -17,10 +17,8 @@ import { Overlay } from './Overlay';
 import { PauseOverlay } from './PauseOverlay';
 import { advanceRound, createInitialState, gameReducer, hydrateState, toPersistedState } from '../game/gameState';
 import type { PersistedGameState } from '../game/gameState';
-import { LETTER_VALUES } from '../game/letterBag';
 import { COLS, ROUNDS, ROWS } from '../game/rounds';
 import { validateBoard } from '../game/validator';
-import { scoreRuns } from '../game/scoring';
 import { boardFromSolution, type SolutionCell } from '../game/adminSolve';
 import type { Board as BoardModel, Tile } from '../game/types';
 import { useAuth } from '../supabase/useAuth';
@@ -173,6 +171,46 @@ export function GameScreen({
   // visually are. Freezing zoom for the duration of any drag removes
   // that whole failure mode regardless of wheelMode.
   const isDraggingRef = useRef(false);
+
+  // .board-fit (a plain box around #board — see the JSX below) grows via
+  // ordinary CSS flex to fill whatever space is genuinely available, but
+  // getting #board itself to then be an exact square derived from THAT
+  // box's size via CSS alone (aspect-ratio + a flex/grid-derived height)
+  // proved unreliable in testing — width and height kept landing at two
+  // different tiny numbers instead of matching. Measuring the actual box
+  // in JS and writing its size onto a CSS variable sidesteps that CSS
+  // ambiguity entirely: #board just reads --board-size, no aspect-ratio
+  // needed. Importantly, the variable is written onto zoomAreaRef (an
+  // ANCESTOR that #board's --board-size read still inherits down
+  // through) rather than back onto board-fit itself — an earlier version
+  // wrote it onto board-fit and also sized board-fit's own width FROM
+  // that same variable, which turned "grow to fill available space" into
+  // a one-way ratchet: each measurement could only confirm or shrink the
+  // previous one, never discover that more room had become available,
+  // since board-fit's own size was no longer determined by real layout
+  // at all. Leaving board-fit's own size fully organic (CSS flex, real
+  // layout) and only ever reading from it — never writing back onto it —
+  // is what makes it able to grow again too, not just shrink.
+  const boardFitRef = useRef<HTMLDivElement>(null);
+  const lastBoardSizeRef = useRef(-1);
+  useEffect(() => {
+    const measureEl = boardFitRef.current;
+    const writeEl = zoomAreaRef.current;
+    if (!measureEl || !writeEl) return;
+    const observer = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      const size = Math.max(0, Math.min(width, height));
+      // A measurement of exactly 0 only happens on the very first
+      // callback, before the page has finished its initial layout pass —
+      // never a real "the board should be invisible" signal.
+      if (size <= 0) return;
+      if (Math.abs(size - lastBoardSizeRef.current) < 1) return;
+      lastBoardSizeRef.current = size;
+      writeEl.style.setProperty('--board-size', `${size}px`);
+    });
+    observer.observe(measureEl);
+    return () => observer.disconnect();
+  }, []);
 
   // Native listeners with { passive: false }, same reasoning as the old
   // Board-local version: preventDefault is required to actually stop the
@@ -456,25 +494,6 @@ export function GameScreen({
     [state.board, state.rack.length],
   );
 
-  // Live, whole-board recompute — used to know what completing the current
-  // round would lock in, and as the ceiling once it does. Not shown
-  // directly once a round is locked; see displayScore below.
-  const liveScore = useMemo(
-    () => scoreRuns(validation.runs, state.board),
-    [validation.runs, state.board],
-  );
-
-  const lockedTotal = useMemo(
-    () => state.roundScores.reduce((a, b) => a + b, 0),
-    [state.roundScores],
-  );
-
-  // Floored at the locked total so temporarily disturbing an earlier
-  // round's words while building the current one never shows as a scary
-  // dip — the number can only drop for real once the round is completed
-  // and locks in (see gameState.ts's advanceRound).
-  const displayScore = Math.max(lockedTotal, liveScore);
-
   const allTiles = useMemo(() => {
     const map = new Map<string, Tile>();
     for (const t of state.rack) map.set(t.id, t);
@@ -513,6 +532,51 @@ export function GameScreen({
   const selectedTileIdsRef = useRef(selectedTileIds);
   selectedTileIdsRef.current = selectedTileIds;
 
+  // Tap-to-place: click a tile to "pick it up" (held here by ID), then
+  // click a board cell (or the rack) to send it there — an alternative to
+  // dragging, aimed at touchscreens where holding-and-dragging precisely
+  // is fiddly. Reuses the exact same MOVE_TILE dispatch drag already
+  // uses, so gameState.ts needs no changes for this at all.
+  const [pickedUpTileId, setPickedUpTileId] = useState<string | null>(null);
+  const pickedUpTileIdRef = useRef(pickedUpTileId);
+  pickedUpTileIdRef.current = pickedUpTileId;
+
+  function handleCellClick(r: number, c: number) {
+    if (paused || finished) return;
+    const held = pickedUpTileIdRef.current;
+    if (held) {
+      playSound('place');
+      dispatch({ type: 'MOVE_TILE', tileId: held, to: { kind: 'board', r, c } });
+      setPickedUpTileId(null);
+      return;
+    }
+    const occupant = boardRef.current[r]?.[c];
+    if (occupant) setPickedUpTileId(occupant.id);
+  }
+
+  function handleRackTileClick(tileId: string) {
+    if (paused || finished) return;
+    const held = pickedUpTileIdRef.current;
+    if (held) {
+      if (held !== tileId) {
+        playSound('place');
+        dispatch({ type: 'MOVE_TILE', tileId: held, to: { kind: 'rack' } });
+      }
+      setPickedUpTileId(null);
+      return;
+    }
+    setPickedUpTileId(tileId);
+  }
+
+  function handleRackAreaClick() {
+    if (paused || finished) return;
+    const held = pickedUpTileIdRef.current;
+    if (!held) return;
+    playSound('place');
+    dispatch({ type: 'MOVE_TILE', tileId: held, to: { kind: 'rack' } });
+    setPickedUpTileId(null);
+  }
+
   const [notReadyMessage, setNotReadyMessage] = useState<string | null>(null);
   useEffect(() => {
     if (!notReadyMessage) return;
@@ -545,11 +609,12 @@ export function GameScreen({
       // dispatch below to take effect on the next render) means its own
       // Date.now() runs a few ms apart from the dispatch's — harmless,
       // since this endTime is only ever used for display, never scoring.
-      await requestSave(toPersistedState(advanceRound(state, liveScore), currentActiveMs()));
+      await requestSave(toPersistedState(advanceRound(state), currentActiveMs()));
     }
     onRoundComplete?.(nextRound);
-    dispatch({ type: 'ADVANCE_ROUND', liveScore });
+    dispatch({ type: 'ADVANCE_ROUND' });
     setSelectedTileIds(new Set());
+    setPickedUpTileId(null);
   }
 
   function handleDeleteTileAt(r: number, c: number) {
@@ -619,6 +684,7 @@ export function GameScreen({
 
       if (e.key === 'Escape') {
         setSelectedTileIds(new Set());
+        setPickedUpTileId(null);
         return;
       }
 
@@ -773,7 +839,7 @@ export function GameScreen({
     if (!adminSolution) return;
     const result = boardFromSolution(adminSolution);
     if (!result) return;
-    dispatch({ type: 'ADMIN_COMPLETE', board: result.board, score: result.score });
+    dispatch({ type: 'ADMIN_COMPLETE', board: result.board });
     onAdminComplete?.();
   }
 
@@ -787,6 +853,7 @@ export function GameScreen({
     if (!roundLetters) {
       dispatch({ type: 'RESTART' });
       setSelectedTileIds(new Set());
+      setPickedUpTileId(null);
       setOverlayDismissed(false);
       activeMsRef.current = 0;
       activeStartRef.current = Date.now();
@@ -799,8 +866,10 @@ export function GameScreen({
       <Hud
         round={state.round}
         elapsedSeconds={elapsedSeconds}
-        score={displayScore}
-        onPause={() => setManuallyPaused(true)}
+        onPause={() => {
+          setManuallyPaused(true);
+          setPickedUpTileId(null);
+        }}
         pauseDisabled={finished}
       />
 
@@ -838,23 +907,39 @@ export function GameScreen({
                 hard cut to an empty rack did. pointer-events:none is a second
                 line of defense alongside handleDragStart's own paused check. */}
             <div className={`playfield${manuallyPaused ? ' playfield-blurred' : ''}`}>
-              <Board
-                board={state.board}
-                cellStatus={validation.cellStatus}
-                typingCursor={typingCursor}
-                onHoverCell={(cell) => setTypingCursor(cell)}
-                onDeleteTile={(tileId) => {
-                  // Right-click-to-delete bypasses both the keyboard guard and
-                  // handleDragStart's own paused/finished check (see those) —
-                  // it's wired straight from TileView's onContextMenu, so it
-                  // needs its own guard here.
-                  if (paused || finished) return;
-                  dispatch({ type: 'MOVE_TILE', tileId, to: { kind: 'rack' } });
-                }}
-                selectedTileIds={selectedTileIds}
-                onSelectionChange={(ids) => setSelectedTileIds(new Set(ids))}
+              {/* Purely a sizing wrapper: grows to fill whatever height is
+                  left in .playfield (no aspect-ratio of its own), so #board
+                  can size itself off THIS box's now-solid height instead of
+                  trying to grow and hold an aspect-ratio at the same time —
+                  that combination on one element resolved inconsistently in
+                  testing (collapsed to near-zero) even though the exact
+                  same "just grow" rule worked correctly one level up. */}
+              <div className="board-fit" ref={boardFitRef}>
+                <Board
+                  board={state.board}
+                  cellStatus={validation.cellStatus}
+                  typingCursor={typingCursor}
+                  onHoverCell={(cell) => setTypingCursor(cell)}
+                  onDeleteTile={(tileId) => {
+                    // Right-click-to-delete bypasses both the keyboard guard and
+                    // handleDragStart's own paused/finished check (see those) —
+                    // it's wired straight from TileView's onContextMenu, so it
+                    // needs its own guard here.
+                    if (paused || finished) return;
+                    dispatch({ type: 'MOVE_TILE', tileId, to: { kind: 'rack' } });
+                  }}
+                  selectedTileIds={selectedTileIds}
+                  onSelectionChange={(ids) => setSelectedTileIds(new Set(ids))}
+                  onCellClick={handleCellClick}
+                  heldTileId={pickedUpTileId}
+                />
+              </div>
+              <Rack
+                rack={state.rack}
+                onTileClick={handleRackTileClick}
+                onAreaClick={handleRackAreaClick}
+                heldTileId={pickedUpTileId}
               />
-              <Rack rack={state.rack} />
             </div>
 
             <Controls
@@ -890,7 +975,6 @@ export function GameScreen({
               style={{ width: activeTileSize.width, height: activeTileSize.height }}
             >
               {activeTile.letter}
-              <span className="pts">{LETTER_VALUES[activeTile.letter]}</span>
             </div>
           ) : null}
         </DragOverlay>
@@ -927,10 +1011,8 @@ export function GameScreen({
       <Overlay
         show={finished && !overlayDismissed}
         finalTime={formatTime(elapsedSeconds)}
-        finalScore={lockedTotal}
-        rounds={state.roundScores.map((roundScore, i) => ({
+        rounds={state.roundCompletedAt.map((_, i) => ({
           round: i + 1,
-          score: roundScore,
           elapsedSeconds: Math.floor(
             (state.roundCompletedAt[i] - (i === 0 ? state.startTime : state.roundCompletedAt[i - 1])) / 1000,
           ),

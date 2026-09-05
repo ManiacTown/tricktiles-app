@@ -3,14 +3,12 @@ import { buildShareText } from '../game/shareText';
 
 interface RoundSummary {
   round: number;
-  score: number;
   elapsedSeconds: number;
 }
 
 interface OverlayProps {
   show: boolean;
   finalTime: string;
-  finalScore: number;
   rounds: RoundSummary[];
   // Daily-only — see the hardcoded placeholder note where this is passed
   // in from DailyChallenge.tsx. Undefined in practice mode, where the
@@ -25,7 +23,7 @@ function formatRoundTime(totalSeconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-export function Overlay({ show, finalTime, finalScore, rounds, puzzleNumber, onExit }: OverlayProps) {
+export function Overlay({ show, finalTime, rounds, puzzleNumber, onExit }: OverlayProps) {
   const [shareStatus, setShareStatus] = useState('');
 
   function flashStatus(message: string) {
@@ -34,7 +32,7 @@ export function Overlay({ show, finalTime, finalScore, rounds, puzzleNumber, onE
   }
 
   async function handleShare() {
-    const text = buildShareText({ puzzleNumber, time: finalTime, score: finalScore });
+    const text = buildShareText({ puzzleNumber, time: finalTime });
     // Native share sheet on mobile when available; clipboard everywhere
     // else. navigator.share rejects on user-cancel — swallowed rather than
     // falling through to the clipboard path, which would show a
@@ -59,7 +57,7 @@ export function Overlay({ show, finalTime, finalScore, rounds, puzzleNumber, onE
   // specifically want the clipboard path (e.g. to paste into a chat)
   // rather than whatever the OS share sheet offers.
   async function handleCopy() {
-    const text = buildShareText({ puzzleNumber, time: finalTime, score: finalScore });
+    const text = buildShareText({ puzzleNumber, time: finalTime });
     try {
       await navigator.clipboard.writeText(text);
       flashStatus('Copied to clipboard!');
@@ -89,10 +87,6 @@ export function Overlay({ show, finalTime, finalScore, rounds, puzzleNumber, onE
             <div className="stat-value">{finalTime}</div>
             <div className="stat-label">Time</div>
           </div>
-          <div className="stat-tile">
-            <div className="stat-value">{finalScore}</div>
-            <div className="stat-label">Score</div>
-          </div>
         </div>
 
         {rounds.length > 0 && (
@@ -101,7 +95,6 @@ export function Overlay({ show, finalTime, finalScore, rounds, puzzleNumber, onE
               <tr>
                 <th>Round</th>
                 <th>Time</th>
-                <th>Score</th>
               </tr>
             </thead>
             <tbody>
@@ -109,7 +102,6 @@ export function Overlay({ show, finalTime, finalScore, rounds, puzzleNumber, onE
                 <tr key={r.round}>
                   <td>{r.round}</td>
                   <td>{formatRoundTime(r.elapsedSeconds)}</td>
-                  <td>{r.score}</td>
                 </tr>
               ))}
             </tbody>

@@ -11,7 +11,6 @@ function stateWithRackTiles(letters: string[]): GameState {
     startTime: Date.now(),
     endTime: null,
     history: [],
-    roundScores: [],
     roundCompletedAt: [],
   };
 }
@@ -148,7 +147,7 @@ describe('MOVE_GROUP', () => {
 describe('ADVANCE_ROUND', () => {
   it('deals the next round tiles into the rack and increments round', () => {
     const state = stateWithRackTiles([]);
-    const next = gameReducer(state, { type: 'ADVANCE_ROUND', liveScore: 10 });
+    const next = gameReducer(state, { type: 'ADVANCE_ROUND' });
     expect(next.round).toBe(1);
     expect(next.rack).toHaveLength(DEALS[1]);
     expect(next.endTime).toBeNull();
@@ -157,40 +156,19 @@ describe('ADVANCE_ROUND', () => {
   it('finishes the game after the last round', () => {
     let state = stateWithRackTiles([]);
     for (let i = 0; i < ROUNDS - 1; i++) {
-      state = gameReducer(state, { type: 'ADVANCE_ROUND', liveScore: 10 * (i + 1) });
+      state = gameReducer(state, { type: 'ADVANCE_ROUND' });
     }
     expect(state.round).toBe(ROUNDS - 1);
-    const finished = gameReducer(state, { type: 'ADVANCE_ROUND', liveScore: 100 });
+    const finished = gameReducer(state, { type: 'ADVANCE_ROUND' });
     expect(finished.round).toBe(ROUNDS);
     expect(finished.endTime).not.toBeNull();
   });
 
-  it('locks each round score as a delta from the cumulative live score', () => {
-    let state = stateWithRackTiles([]);
-    state = gameReducer(state, { type: 'ADVANCE_ROUND', liveScore: 15 });
-    expect(state.roundScores).toEqual([15]);
-
-    state = gameReducer(state, { type: 'ADVANCE_ROUND', liveScore: 40 });
-    expect(state.roundScores).toEqual([15, 25]);
-  });
-
-  it("keeps round 1's locked delta immutable even when round 2 damages earlier value", () => {
-    let state = stateWithRackTiles([]);
-    state = gameReducer(state, { type: 'ADVANCE_ROUND', liveScore: 20 });
-    // The player broke an earlier word while placing round 2's tiles and
-    // didn't fix it before completing the round — round 2's own delta is
-    // honestly negative, but round 1's already-locked entry (20) never
-    // changes; only the running total reflects the damage.
-    state = gameReducer(state, { type: 'ADVANCE_ROUND', liveScore: 12 });
-    expect(state.roundScores).toEqual([20, -8]);
-    expect(state.roundScores.reduce((a, b) => a + b, 0)).toBe(12);
-  });
-
   it('records a completion timestamp per round', () => {
     let state = stateWithRackTiles([]);
-    state = gameReducer(state, { type: 'ADVANCE_ROUND', liveScore: 10 });
+    state = gameReducer(state, { type: 'ADVANCE_ROUND' });
     expect(state.roundCompletedAt).toHaveLength(1);
-    state = gameReducer(state, { type: 'ADVANCE_ROUND', liveScore: 20 });
+    state = gameReducer(state, { type: 'ADVANCE_ROUND' });
     expect(state.roundCompletedAt).toHaveLength(2);
   });
 });

@@ -14,13 +14,8 @@ export interface GameState {
   // daily_puzzles.rounds), sourced instead of the random letter bag.
   // Undefined in practice mode, where rounds deal randomly as before.
   roundLetters?: string[];
-  // Per-round locked score deltas (index 0 = round 1, etc.), set once when
-  // that round completes and never recomputed afterward — so rearranging
-  // an earlier round's tiles while working on a later one can't
-  // retroactively change what's already been "banked." Sum for the total.
-  roundScores: number[];
-  // Wall-clock time each round completed, parallel to roundScores — used
-  // for the end screen's round-by-round breakdown.
+  // Wall-clock time each round completed — used for the end screen's
+  // round-by-round breakdown.
   roundCompletedAt: number[];
 }
 
@@ -39,7 +34,6 @@ export interface PersistedGameState {
   round: number;
   startTime: number;
   endTime: number | null;
-  roundScores: number[];
   roundCompletedAt: number[];
   // Accumulated milliseconds of confirmed-active play time (GameScreen's
   // own bookkeeping, not derived from startTime here) — checkpointed on
@@ -54,8 +48,8 @@ export interface PersistedGameState {
 }
 
 export function toPersistedState(state: GameState, activeMs: number): PersistedGameState {
-  const { board, rack, round, startTime, endTime, roundScores, roundCompletedAt } = state;
-  return { board, rack, round, startTime, endTime, roundScores, roundCompletedAt, activeMs };
+  const { board, rack, round, startTime, endTime, roundCompletedAt } = state;
+  return { board, rack, round, startTime, endTime, roundCompletedAt, activeMs };
 }
 
 export function hydrateState(persisted: PersistedGameState, roundLetters?: string[]): GameState {
@@ -64,11 +58,7 @@ export function hydrateState(persisted: PersistedGameState, roundLetters?: strin
 
 export type GameAction =
   | { type: 'MOVE_TILE'; tileId: string; to: { kind: 'rack' } | { kind: 'board'; r: number; c: number } }
-  // liveScore is the full-board score at the moment the round completes,
-  // computed by the caller (which already has the validator result) — the
-  // reducer derives this round's own delta from it rather than
-  // re-running word validation itself.
-  | { type: 'ADVANCE_ROUND'; liveScore: number }
+  | { type: 'ADVANCE_ROUND' }
   | { type: 'RESTART' }
   | { type: 'UNDO' }
   // Moves a whole set of board tiles by the same (dr, dc) offset in one
@@ -82,9 +72,9 @@ export type GameAction =
   // shift can never make group members collide with each other.
   | { type: 'MOVE_GROUP'; tileIds: string[]; dr: number; dc: number }
   // Admin/testing shortcut: jump straight to a finished game with a given
-  // (already-solved, already-translated-to-fit-the-board) board and final
-  // score, skipping manual play entirely. See GameScreen's admin button.
-  | { type: 'ADMIN_COMPLETE'; board: Board; score: number };
+  // (already-solved, already-translated-to-fit-the-board) board, skipping
+  // manual play entirely. See GameScreen's admin button.
+  | { type: 'ADMIN_COMPLETE'; board: Board };
 
 const MAX_HISTORY = 50;
 
@@ -109,7 +99,6 @@ export function createInitialState(roundLetters?: string[]): GameState {
     endTime: null,
     history: [],
     roundLetters,
-    roundScores: [],
     roundCompletedAt: [],
   };
 }
@@ -199,27 +188,23 @@ function moveGroup(state: GameState, tileIds: string[], dr: number, dc: number):
 // state WILL be — specifically its endTime — in order to save it before
 // notifying the server the round is complete, rather than after. See that
 // function's own comment for why the ordering matters.
-export function advanceRound(state: GameState, liveScore: number): GameState {
-  const previouslyLocked = state.roundScores.reduce((a, b) => a + b, 0);
-  const roundScores = [...state.roundScores, liveScore - previouslyLocked];
+export function advanceRound(state: GameState): GameState {
   const roundCompletedAt = [...state.roundCompletedAt, Date.now()];
 
   const nextRound = state.round + 1;
   if (nextRound >= ROUNDS) {
-    return { ...state, round: ROUNDS, endTime: Date.now(), roundScores, roundCompletedAt };
+    return { ...state, round: ROUNDS, endTime: Date.now(), roundCompletedAt };
   }
   return {
     ...state,
     round: nextRound,
-    roundScores,
     roundCompletedAt,
     rack: [...state.rack, ...tilesForRound(nextRound, state.roundLetters)],
   };
 }
 
-function adminComplete(state: GameState, board: Board, score: number): GameState {
+function adminComplete(state: GameState, board: Board): GameState {
   const now = Date.now();
-  const roundScores = Array.from({ length: ROUNDS }, (_, i) => (i === ROUNDS - 1 ? score : 0));
   const roundCompletedAt = Array.from({ length: ROUNDS }, () => now);
   return {
     ...state,
@@ -227,7 +212,6 @@ function adminComplete(state: GameState, board: Board, score: number): GameState
     rack: [],
     round: ROUNDS,
     endTime: now,
-    roundScores,
     roundCompletedAt,
   };
 }
@@ -244,7 +228,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'MOVE_TILE':
       return moveTile(state, action);
     case 'ADVANCE_ROUND':
-      return advanceRound(state, action.liveScore);
+      return advanceRound(state);
     case 'RESTART':
       return createInitialState(state.roundLetters);
     case 'UNDO':
@@ -252,7 +236,7 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case 'MOVE_GROUP':
       return moveGroup(state, action.tileIds, action.dr, action.dc);
     case 'ADMIN_COMPLETE':
-      return adminComplete(state, action.board, action.score);
+      return adminComplete(state, action.board);
     default:
       return state;
   }

@@ -16,7 +16,7 @@ describe('boardFromSolution', () => {
     ]);
 
     expect(result).not.toBeNull();
-    const { board, score } = result!;
+    const { board } = result!;
 
     for (const row of board) {
       expect(row).toHaveLength(COLS);
@@ -27,7 +27,6 @@ describe('boardFromSolution', () => {
       .map((r) => r.word)
       .sort();
     expect(words).toEqual(['CAR', 'CAT']);
-    expect(score).toBeGreaterThan(0);
   });
 
   it('returns null for an empty solution', () => {

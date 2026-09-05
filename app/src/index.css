@@ -53,6 +53,24 @@ body {
   padding: 32px 16px 48px;
 }
 
+/* While a gameplay tab (Daily/Practice) is active, #root gets a REAL height
+   cap instead of just a minimum — that's what lets its flex children (see
+   .tab-panel in App.css) compete for a fixed pool of space instead of the
+   page just growing past the viewport and scrolling. 100dvh (dynamic
+   viewport height) overrides 100vh in browsers that support it, accounting
+   for a mobile browser's address bar showing/hiding; 100vh is the
+   automatic fallback everywhere else. */
+body.game-tab-active #root {
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  /* The 32px/48px top/bottom padding above is pure fixed overhead that
+     directly competes with the board for space on a short viewport —
+     shrinking it here (still centered, just tighter) hands that back. */
+  padding-top: clamp(4px, 1.5vh, 16px);
+  padding-bottom: clamp(4px, 1.5vh, 20px);
+}
+
 @media (max-width: 480px) {
   #root {
     padding: 20px 8px 32px;

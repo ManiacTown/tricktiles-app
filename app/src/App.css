@@ -20,6 +20,24 @@ header {
   margin-bottom: 8px;
   text-align: center;
 }
+/* Branding/navigation chrome that matters less while actively playing —
+   compacted (not hidden) specifically during gameplay to free up more room
+   for the board, same vh-clamp technique used elsewhere in this file.
+   Untouched on Profile/Badges/Leaderboard, where there's no board
+   competing for the space. */
+body.game-tab-active header {
+  margin-bottom: clamp(2px, 0.5vh, 4px);
+}
+body.game-tab-active h1 {
+  font-size: clamp(12px, 2vh, 16px);
+}
+/* The "DAILY WORD GRID" line under the title — dropped entirely while
+   playing rather than just shrunk further; below a certain size it stops
+   being legible anyway, so removing that line outright saves more real
+   height than trying to keep shrinking illegible text. */
+body.game-tab-active .subtitle {
+  display: none;
+}
 .footer {
   width: 100%;
   max-width: 660px;
@@ -30,6 +48,11 @@ header {
   padding: 16px 0;
   text-align: center;
 }
+body.game-tab-active .footer {
+  margin-top: clamp(2px, 0.5vh, 8px);
+  padding: clamp(2px, 0.5vh, 6px) 0;
+  gap: 10px;
+}
 .footer button {
   background: transparent;
   color: var(--ink-soft);
@@ -38,6 +61,10 @@ header {
   font-weight: 600;
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+body.game-tab-active .footer button {
+  font-size: 10px;
+  padding: 2px 0;
 }
 .footer button:hover:not(:disabled) {
   color: var(--accent);
@@ -59,38 +86,43 @@ h1 {
 
 .hud {
   display: flex;
-  gap: 12px;
+  gap: 4px;
   max-width: 660px;
   width: 100%;
-  margin: 16px 0 20px;
+  /* clamp()s here (and in .hud-item/.hud-value below) shrink toward their
+     low end on a SHORT viewport specifically (vh-based, not vw) — a phone
+     in portrait is narrow but that's not the constraint that matters here;
+     a short window is. Matches the clamp() technique .tile's font-size
+     already used, just vh instead of vw since height is what's scarce. */
+  margin: clamp(2px, 0.5vh, 4px) 0 clamp(2px, 0.5vh, 6px);
 }
 .hud-item {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 10px 16px;
+  padding: clamp(1px, 0.4vh, 3px) clamp(4px, 1vw, 8px);
   flex: 1;
   text-align: center;
 }
 .hud-label {
-  font-size: 10px;
+  font-size: clamp(6px, 1vh, 7px);
   letter-spacing: 1.5px;
   text-transform: uppercase;
   color: var(--ink-soft);
 }
 .hud-value {
-  font-size: 20px;
+  font-size: clamp(10px, 1.8vh, 12px);
   font-weight: 700;
   color: var(--ink);
-  margin-top: 2px;
+  margin-top: 1px;
 }
 .hud-pause-btn {
   flex: 0 0 auto;
-  width: 44px;
+  width: clamp(26px, 4vh, 36px);
   background: var(--surface);
   border: 1px solid var(--border);
   color: var(--ink);
-  font-size: 16px;
+  font-size: clamp(11px, 2vh, 14px);
   border-radius: 10px;
   padding: 0;
 }
@@ -106,6 +138,22 @@ h1 {
   max-width: 660px;
   overflow: auto;
 }
+/* Continues the flexible-region chain from .tab-panel above — this is the
+   box .zoom-wrap's own overflow:auto (comment above) was already written
+   to expect, it just never had a real height to work against before now.
+   display:flex here too (not just flex:1 as an ITEM) so its own child
+   (.zoom-scale) can size itself via flex:1 as well, rather than via a
+   height:100% percentage — percentage heights need a parent with an
+   EXPLICITLY set height and turned out unreliable through this many
+   nested levels; flex:1 all the way down was the version that actually
+   worked when tested. */
+body.game-tab-active .zoom-wrap {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
 /* The actual scaled element (see GameScreen's zoom state) — everything
    below the Hud scales together so the rack/controls stay proportional
    to the board instead of the board zooming on its own. 50% 0% keeps the
@@ -118,6 +166,11 @@ h1 {
   width: 100%;
   transform-origin: 50% 0%;
 }
+body.game-tab-active .zoom-scale {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
 
 /* Wraps the board + rack so pausing can blur both together in one filter
    (rather than the board and rack separately drifting out of sync) while
@@ -128,6 +181,19 @@ h1 {
   align-items: center;
   width: 100%;
   transition: filter 0.3s ease;
+}
+body.game-tab-active .playfield {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+/* Controls sits next to .playfield inside .zoom-scale — .controls is also
+   the class name the top-level mode-tab row uses, so this must stay scoped
+   with a child selector rather than a bare .controls rule, or it would
+   also affect the tab buttons. Explicit flex:0 0 auto keeps it pinned to
+   its natural size so .playfield is the only thing that shrinks. */
+body.game-tab-active .zoom-scale > .controls {
+  flex: 0 0 auto;
 }
 .playfield-blurred {
   filter: blur(10px);
@@ -141,10 +207,15 @@ h1 {
 
 #board {
   display: grid;
-  grid-template-columns: repeat(13, minmax(0, 1fr));
-  gap: 3px;
+  grid-template-columns: repeat(11, minmax(0, 1fr));
+  grid-template-rows: repeat(11, minmax(0, 1fr));
+  /* Tightened from 3px/14px — on a phone-width board this fixed overhead
+     (padding + all 10 gaps) was eating a real chunk of the available
+     width before any of it reached actual cells; smaller here gives more
+     of the board's own box to the cells themselves. */
+  gap: 2px;
   background: var(--board-bg);
-  padding: 14px;
+  padding: 8px;
   border-radius: 16px;
   width: 100%;
   max-width: 660px;
@@ -153,6 +224,172 @@ h1 {
      gesture. */
   user-select: none;
   -webkit-user-select: none;
+}
+/* Board sizing everywhere else is width-only (max-width above) — fine when
+   there's always enough vertical room, but on a short viewport that leaves
+   the board free to overflow downward even while it fits horizontally.
+   While a gameplay tab is active, GameScreen wraps #board in a plain
+   .board-fit div that grows to fill whatever space is left (flex:1), and
+   a ResizeObserver (GameScreen.tsx) measures that box and writes the
+   larger square that fits inside it onto --board-size — several CSS-only
+   attempts (percentage height, aspect-ratio, flex auto-stretch, in various
+   combinations) all landed on the wrong size in testing, so this sidesteps
+   that entirely: #board just reads the variable JS already computed. */
+body.game-tab-active .board-fit {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+body.game-tab-active #board {
+  width: var(--board-size, 100%);
+  height: var(--board-size, 100%);
+  max-width: 100%;
+}
+body.game-tab-active #rackWrap {
+  flex: 0 0 auto;
+}
+/* On a wide screen there's a lot of unused space either side of the
+   660px-wide centered column — putting the Shift/Undo/Complete Round
+   controls beside the board instead of stacked below it uses that
+   horizontal room to buy back vertical room for the board, without
+   touching narrow/mobile screens at all (where there's no spare width to
+   do this with, and the normal stacked layout is exactly what's wanted). */
+@media (min-width: 960px) {
+  body.game-tab-active .zoom-wrap {
+    max-width: 1100px;
+  }
+  /* position:relative here is what .controls' absolute positioning
+     (below) anchors against. */
+  body.game-tab-active .zoom-scale {
+    position: relative;
+    flex-direction: row;
+    align-items: stretch;
+    justify-content: center;
+    gap: 6px;
+  }
+  /* Taken OUT of the flex row entirely (position:absolute) rather than
+     matched in width to the rack — .controls is much wider than the
+     rack, and trying to center a row containing both of them as regular
+     flex items always drags the board toward whichever side is wider.
+     Positioned explicitly via calc() instead of a plain left:100%:
+     .zoom-scale itself spans the FULL width of the wrap (up to 900px),
+     not just the board's width, so left:100% would push this off to the
+     far right rather than landing next to the board — the formula
+     reconstructs where the board's own centered right edge actually
+     falls (half of .zoom-scale's width, plus half of the board's current
+     --board-size — .playfield contains ONLY the board now that #rackWrap
+     is ALSO absolutely positioned, out of this same row, below), then
+     adds an 8px gap — the same 8px #rackWrap uses on the opposite side,
+     so both sides sit an equal distance from the board. */
+  body.game-tab-active .zoom-scale > .controls {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: calc(50% + var(--board-size, 300px) / 2 + 8px);
+    flex-direction: column;
+    /* space-between pins the first item (Complete Round) to the very top
+       and the last (Shift Board) to the very bottom, with the one in
+       between (Undo) landing exactly centered — top:0/bottom:0 above
+       gives .controls the board's own full height to spread across, so
+       "top/middle/bottom" here means the board's top/middle/bottom. */
+    justify-content: space-between;
+    width: auto;
+    max-width: 180px;
+    margin-top: 0;
+  }
+  /* #nextBtn's flex:1 correctly fills leftover space in the normal
+     horizontal row layout — in this column sidebar it fills leftover
+     VERTICAL space instead, stretching into a giant button. Pinning it to
+     its natural size here keeps it a normal-looking button in both
+     layouts without touching the shared rule itself. */
+  body.game-tab-active .zoom-scale > .controls #nextBtn {
+    flex: 0 0 auto;
+  }
+  /* Visual order only (CSS order:), not DOM order — GameScreen.tsx still
+     renders shift-group/Undo/Complete Round in that markup order, this
+     just repaints them top-to-bottom as Complete Round, Undo, Shift
+     Board instead. */
+  body.game-tab-active .zoom-scale > .controls #nextBtn {
+    order: 1;
+  }
+  body.game-tab-active .zoom-scale > .controls #undoBtn {
+    order: 2;
+  }
+  body.game-tab-active .zoom-scale > .controls .shift-group {
+    order: 3;
+  }
+
+  /* Rack moves from below the board to a vertical strip on its left —
+     order:-1 flips its visual position without touching GameScreen.tsx's
+     DOM order (Board still renders first in the markup). .playfield
+     switches from a column stack to a row so the two sit side by side. */
+  /* flex:1 here (inherited from the earlier unconditional narrow-layout
+     rule) now means "grow to fill the ROW's width" instead of "grow
+     taller" — which is exactly what's wanted: .playfield (and, by the
+     same inherited flex:1, .board-fit inside it) organically claims
+     .zoom-scale's real available width, the same way it already
+     organically claims real available HEIGHT via align-items:stretch.
+     That "organic, not CSS-variable-driven" growth is what lets the
+     ResizeObserver watching .board-fit (GameScreen.tsx) correctly
+     discover MORE space becoming available, not just less — a version
+     that instead set .board-fit's own width FROM the measured value
+     could only ever shrink or hold steady, never grow back, since the
+     next measurement was always capped by what it had just set. */
+  body.game-tab-active .playfield {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 8px;
+  }
+  /* #board itself (App.css, unconditional rule) still sizes off
+     --board-size — .board-fit being wider than the (smaller, square)
+     board is fine now that rack/sidebar are positioned relative to
+     .zoom-scale directly (below), not to .playfield's own edges, so a
+     wider .board-fit no longer visibly separates anything. */
+  body.game-tab-active #rackWrap {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    /* Mirrors .controls' own left: below exactly — same distance from
+       center, opposite side, both measured from the board's real
+       (JS-measured) size rather than from .playfield's now-much-wider
+       box. */
+    right: calc(50% + var(--board-size, 300px) / 2 + 8px);
+    width: 60px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  /* Smaller than the normal 30-46px rack-tile range — in this sidebar
+     layout the rack sits right next to the board, so matching it closer
+     to the board's own (much smaller) individual cell size reads as one
+     consistent scale instead of the rack tiles looking oversized next to
+     the grid they're being dragged onto. */
+  body.game-tab-active #rack .tile {
+    width: clamp(20px, 4vh, 30px);
+    height: clamp(20px, 4vh, 30px);
+  }
+  /* #rackLabel's full sentence doesn't fit a ~100px column — still there
+     for screen readers/context, just no longer trying to lay itself out
+     as a single readable line at this width. */
+  body.game-tab-active #rackLabel {
+    font-size: 8px;
+    line-height: 1.3;
+  }
+  /* #rack normally wraps LEFT-TO-RIGHT then down (a wide, short shelf) —
+     constraining its width to one tile's worth makes that same wrapping
+     behavior stack tiles top-to-bottom instead, with no flex-direction
+     change needed. */
+  body.game-tab-active #rack {
+    width: 100%;
+    /* center (not flex-start) so each row of tiles — even a row with just
+       one tile in it, common at this narrow a width — sits centered in
+       the column instead of pinned to its left edge. */
+    justify-content: center;
+  }
 }
 .cell {
   aspect-ratio: 1/1;
@@ -208,17 +445,17 @@ h1 {
 .tile.dragging {
   visibility: hidden;
 }
+/* Tap-to-place's "armed" indicator (GameScreen.tsx) — lifted and ringed
+   in the accent color so it's obvious which tile a subsequent cell click
+   will place, especially on touch where there's no hover state to rely
+   on instead. */
+.tile.held {
+  transform: translateY(-3px);
+  box-shadow: 0 0 0 2px var(--accent), 0 4px 10px rgba(0, 0, 0, 0.2);
+}
 .tile.drag-overlay {
   opacity: 0.85;
   cursor: grabbing;
-}
-.tile .pts {
-  position: absolute;
-  bottom: 2px;
-  right: 3px;
-  font-size: 7px;
-  font-weight: 700;
-  color: var(--ink-soft);
 }
 .tile.valid {
   background: var(--accent-soft);
@@ -254,21 +491,21 @@ h1 {
   margin-top: 20px;
 }
 #rackLabel {
-  font-size: 10px;
+  font-size: clamp(8px, 1.5vh, 10px);
   letter-spacing: 1.5px;
   text-transform: uppercase;
   color: var(--ink-soft);
-  margin-bottom: 8px;
+  margin-bottom: clamp(3px, 1vh, 8px);
 }
 #rack {
   background: var(--rack-bg);
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 12px;
-  min-height: 74px;
+  padding: clamp(4px, 1vh, 8px);
+  min-height: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
   touch-action: none;
   transition: background 0.15s;
@@ -277,24 +514,35 @@ h1 {
   background: var(--accent-soft);
 }
 #rack .tile {
-  width: 46px;
-  height: 46px;
+  /* Tied to --board-size (GameScreen.tsx measures it, same variable
+     #board itself uses) rather than viewport height — a vh-based size
+     shrinks with a SHORT screen but not a NARROW one, so on a narrow
+     phone the board (width-constrained) shrank a lot while the rack
+     tiles barely did, leaving them looking oversized next to a now-tiny
+     board. This is the EXACT board-cell formula, not an approximation:
+     #board is an 11x11 grid with 8px padding on each side (16px total)
+     and 2px gaps between all 10 row/column pairs (20px total) — so of
+     any given --board-size, (size - 16px - 20px) / 11 is precisely one
+     cell's width. Matching rack tiles to that exactly is what keeps them
+     the same size as the cells they're being dragged onto, at any screen
+     size. clamp()'s min/max still guard against the rack getting too
+     small to comfortably tap, or too large if a future layout ever gives
+     --board-size room to be huge. */
+  width: clamp(18px, calc((var(--board-size, 400px) - 36px) / 11), 46px);
+  height: clamp(18px, calc((var(--board-size, 400px) - 36px) / 11), 46px);
   flex-shrink: 0;
 }
-@media (max-width: 480px) {
-  #rack .tile {
-    width: 38px;
-    height: 38px;
-  }
-  .tile .pts {
-    font-size: 6px;
-  }
-}
-
 .controls {
   display: flex;
   gap: 10px;
-  margin-top: 18px;
+  /* No align-items was ever set here, so the default (stretch) made
+     Undo/Complete Round stretch to match the D-pad's height — the
+     tallest natural content in the row — rather than sizing to their own
+     text. center lets each button keep its own natural height instead. */
+  align-items: center;
+  /* App.tsx's mode-tabs row overrides this with an inline style, so this
+     only actually affects the in-game Controls row (shift/undo/complete). */
+  margin-top: clamp(4px, 1vh, 10px);
   width: 100%;
   max-width: 660px;
 }
@@ -348,8 +596,8 @@ button:disabled {
 }
 .shift-controls {
   display: grid;
-  grid-template-columns: repeat(3, 28px);
-  grid-template-rows: repeat(2, 28px);
+  grid-template-columns: repeat(3, clamp(20px, 5vh, 28px));
+  grid-template-rows: repeat(2, clamp(20px, 5vh, 28px));
   gap: 4px;
 }
 .shift-btn {
@@ -387,11 +635,17 @@ button:disabled {
    centering can't live on .controls itself. */
 .mode-tabs {
   justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 .mode-tab {
   background: var(--surface);
   color: var(--ink);
   border: 1px solid var(--border);
+}
+body.game-tab-active .mode-tab {
+  padding: clamp(3px, 0.7vh, 6px) clamp(5px, 1.2vw, 10px);
+  font-size: clamp(9px, 1.4vh, 11px);
 }
 .mode-tab:hover:not(.active) {
   border-color: var(--accent);
@@ -411,6 +665,21 @@ button:disabled {
 }
 .tab-panel-hidden {
   display: none;
+}
+/* Only while a gameplay tab is active (see App.tsx's game-tab-active
+   toggle) does the visible tab-panel become #root's flexible region,
+   soaking up whatever height is left after the header/tabs/footer take
+   their natural size — see the matching .zoom-wrap/.zoom-scale/.playfield/
+   #board rules below for how that space then flows further down. Profile/
+   Badges/Leaderboard never get this rule, so they keep their normal
+   content-sized, scrollable behavior. min-height:0 overrides flexbox's
+   default of "never shrink below content size", which would otherwise
+   silently break this chain at the very first link. */
+body.game-tab-active .tab-panel:not(.tab-panel-hidden) {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .admin-btn {
@@ -440,6 +709,15 @@ button:disabled {
   margin-top: 12px;
   min-height: 16px;
   color: var(--ink-soft);
+}
+/* Hidden during gameplay so .zoom-wrap (flex:1, fills whatever's left —
+   see the vertical-fit chain earlier in this file) reclaims the space
+   this line used to take, letting the board grow into it. This also
+   removes the only visual feedback for the "tried to finish an invalid
+   round" case — that moment still has its own error sound (sound.ts),
+   just no on-screen text now. */
+body.game-tab-active .status {
+  display: none;
 }
 
 /* Shared full-screen backdrop for both the win/result overlay and the

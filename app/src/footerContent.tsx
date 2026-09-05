@@ -1,10 +1,12 @@
+import type { ReactElement } from 'react';
+
 export type FooterPageId = 'about' | 'privacy' | 'terms' | 'updates';
 
 export interface FooterPage {
   id: FooterPageId;
   label: string;
   title: string;
-  content: JSX.Element;
+  content: ReactElement;
 }
 
 export const FOOTER_PAGES: FooterPage[] = [

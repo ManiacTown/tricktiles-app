@@ -10,9 +10,11 @@ interface CellProps {
   status?: TileStatus;
   isTypingCursor: boolean;
   isSelected: boolean;
+  isHeld: boolean;
   onHoverChange?: (cell: { r: number; c: number } | null) => void;
   onDeleteTile?: (tileId: string) => void;
   onMarqueeStart?: (cell: { r: number; c: number }) => void;
+  onCellClick?: (r: number, c: number) => void;
 }
 
 function Cell({
@@ -22,9 +24,11 @@ function Cell({
   status,
   isTypingCursor,
   isSelected,
+  isHeld,
   onHoverChange,
   onDeleteTile,
   onMarqueeStart,
+  onCellClick,
 }: CellProps) {
   const { setNodeRef, isOver } = useDroppable({ id: `cell-${r}-${c}` });
   const classes = ['cell'];
@@ -49,8 +53,15 @@ function Cell({
           onMarqueeStart?.({ r, c });
         }
       }}
+      // Tap-to-place: fires on this cell's own div, so a click landing on
+      // the tile INSIDE it (no separate onClick on that TileView) bubbles
+      // up here too — GameScreen looks at its own board state to decide
+      // whether this click means "pick up the tile here" or "place the
+      // held tile here", so one handler covers both empty and occupied
+      // cells.
+      onClick={() => onCellClick?.(r, c)}
     >
-      {tile && <TileView tile={tile} status={status} onDelete={onDeleteTile} />}
+      {tile && <TileView tile={tile} status={status} onDelete={onDeleteTile} held={isHeld} />}
     </div>
   );
 }
@@ -76,6 +87,12 @@ interface BoardProps {
   // Called once a marquee-drag finishes, with every tile ID whose cell
   // fell inside the dragged rectangle (possibly empty).
   onSelectionChange?: (tileIds: string[]) => void;
+  // Tap-to-place (see GameScreen) — fires for a click on any cell,
+  // occupied or not; GameScreen decides what that means from its own
+  // "is something currently held" state.
+  onCellClick?: (r: number, c: number) => void;
+  // The tile currently picked up for tap-to-place, if any.
+  heldTileId?: string | null;
 }
 
 export function Board({
@@ -86,6 +103,8 @@ export function Board({
   onDeleteTile,
   selectedTileIds,
   onSelectionChange,
+  onCellClick,
+  heldTileId,
 }: BoardProps) {
   // Marquee (drag-select) for grouping multiple board tiles. Tracked as
   // cell coordinates rather than pixels — simpler, and correct at any
@@ -151,11 +170,13 @@ export function Board({
             status={cellStatus.get(`${r},${c}`)}
             isTypingCursor={typingCursor?.r === r && typingCursor?.c === c}
             isSelected={Boolean(tile && selectedTileIds?.has(tile.id)) || isInMarqueeRect(r, c)}
+            isHeld={Boolean(tile && tile.id === heldTileId)}
             onHoverChange={(cell) => {
               onHoverCell?.(cell);
               if (cell && marqueeAnchor) setMarqueeCurrent(cell);
             }}
             onDeleteTile={onDeleteTile}
+            onCellClick={onCellClick}
             onMarqueeStart={(cell) => {
               setMarqueeAnchor(cell);
               setMarqueeCurrent(cell);

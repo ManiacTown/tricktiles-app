@@ -5,12 +5,10 @@
 export function buildShareText({
   puzzleNumber,
   time,
-  score,
 }: {
   puzzleNumber?: number;
   time: string;
-  score: number;
 }): string {
   const header = puzzleNumber != null ? `TrickTiles #${puzzleNumber}` : 'TrickTiles (Practice)';
-  return `${header}\nTime: ${time}\nScore: ${score}`;
+  return `${header}\nTime: ${time}`;
 }
