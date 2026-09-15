@@ -13,10 +13,15 @@ function formatTime(totalSeconds: number): string {
 const RANK_MEDALS = ['🥇', '🥈', '🥉'];
 const RANK_CLASSES = ['leaderboard-row-gold', 'leaderboard-row-silver', 'leaderboard-row-bronze'];
 
+// How many rows show at once — once the leaderboard has more entries than
+// this, it splits into pages instead of one long scrolling list.
+const PAGE_SIZE = 12;
+
 export function Leaderboard() {
   const { loading: authLoading, session, profile, signUp, signIn } = useAuth();
   const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
 
   useEffect(() => {
     if (!session) return;
@@ -25,7 +30,10 @@ export function Leaderboard() {
     getTodayPuzzle()
       .then((puzzle) => getLeaderboard(puzzle.id, 500))
       .then((r) => {
-        if (!cancelled) setRows(r);
+        if (!cancelled) {
+          setRows(r);
+          setPage(0);
+        }
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : "Couldn't load the leaderboard.");
@@ -52,6 +60,9 @@ export function Leaderboard() {
   }
 
   const myRank = rows.findIndex((row) => row.user_id === session.user.id);
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const pageStart = page * PAGE_SIZE;
+  const pageRows = rows.slice(pageStart, pageStart + PAGE_SIZE);
 
   return (
     <>
@@ -74,15 +85,20 @@ export function Leaderboard() {
         <div className="profile-panel">
           {myRank >= 0 && <div className="leaderboard-you-banner">You are rank #{myRank + 1}</div>}
           <div className="leaderboard-list">
-            {rows.map((row, i) => {
+            {pageRows.map((row, i) => {
+              // Rank is this row's position across the WHOLE leaderboard,
+              // not just within this page — row 0 on page 2 is rank 11,
+              // not rank 1. pageStart converts the on-page index back to
+              // that real overall position.
+              const rank = pageStart + i;
               const isMe = row.user_id === session.user.id;
-              const rankClass = RANK_CLASSES[i] ?? '';
+              const rankClass = RANK_CLASSES[rank] ?? '';
               return (
                 <div
                   className={`leaderboard-row${rankClass ? ` ${rankClass}` : ''}${isMe ? ' leaderboard-row-me' : ''}`}
                   key={row.session_id}
                 >
-                  <div className="leaderboard-rank">{RANK_MEDALS[i] ?? i + 1}</div>
+                  <div className="leaderboard-rank">{RANK_MEDALS[rank] ?? rank + 1}</div>
                   <div className="leaderboard-name">
                     {row.username}
                     {row.selected_emoji && <span className="leaderboard-flair">{row.selected_emoji}</span>}
@@ -93,6 +109,23 @@ export function Leaderboard() {
               );
             })}
           </div>
+          {totalPages > 1 && (
+            <div className="leaderboard-pagination">
+              <button type="button" onClick={() => setPage((p) => p - 1)} disabled={page === 0}>
+                ← Prev
+              </button>
+              <div className="small">
+                Page {page + 1} of {totalPages}
+              </div>
+              <button
+                type="button"
+                onClick={() => setPage((p) => p + 1)}
+                disabled={page >= totalPages - 1}
+              >
+                Next →
+              </button>
+            </div>
+          )}
         </div>
       )}
     </>

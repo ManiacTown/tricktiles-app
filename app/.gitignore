@@ -25,3 +25,8 @@ dist-ssr
 *.sw?
 
 .vercel
+
+# One-off local test scripts (fake account seeding, etc.) — not part of
+# the app, never meant to be committed.
+seed-fake-leaderboard*.mjs
+test-signup.mjs

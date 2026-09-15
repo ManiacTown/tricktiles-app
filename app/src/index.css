@@ -13,6 +13,29 @@
   --incomplete: #b6b2a6;
 }
 
+/* Dark mode (theme.ts toggles this attribute on <html>, saved to
+   localStorage — a device-only preference, not synced to the account
+   like Mouse Wheel is). Nearly everything in this file is already built
+   from these variables rather than hardcoded colors, so redefining them
+   here is most of what dark mode needs — same hues as the light palette
+   above, just re-balanced for a dark background instead of re-picked
+   from scratch, so accent/invalid still read as "the same green" and
+   "the same terracotta" in both themes. */
+:root[data-theme='dark'] {
+  --bg: #1c1b18;
+  --surface: #262521;
+  --board-bg: #2f2d28;
+  --rack-bg: #302e29;
+  --border: #423f38;
+  --ink: #ece9e2;
+  --ink-soft: #a8a49a;
+  --accent: #8fb5a0;
+  --accent-soft: rgba(143, 181, 160, 0.16);
+  --invalid: #e0917a;
+  --invalid-soft: rgba(224, 145, 122, 0.16);
+  --incomplete: #6b675e;
+}
+
 * {
   box-sizing: border-box;
 }

@@ -5,8 +5,14 @@ import type { BadgeRow, DailyPuzzleRow, GameSessionRow, LeaderboardRow } from '.
 
 // UTC calendar date, matching solver/generate's seedFromDate — see the
 // timezone decision documented in tricktiles_build_plan.md section 2.
+//
+// VITE_DEBUG_DATE is a local-only testing override — set it in your own
+// app/.env (gitignored, never committed) to a date like '2026-09-14' to
+// load a past puzzle instead of today's, e.g. when today's hasn't been
+// published yet. Leave it unset for normal use.
 function todayUTC(): string {
-  return new Date().toISOString().slice(0, 10);
+  const debugDate = import.meta.env.VITE_DEBUG_DATE as string | undefined;
+  return debugDate || new Date().toISOString().slice(0, 10);
 }
 
 // The client has no generated Database schema (see client.ts), so

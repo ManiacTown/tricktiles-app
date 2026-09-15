@@ -642,8 +642,9 @@ button:disabled {
   background: var(--surface);
   color: var(--ink);
   border: 1px solid var(--border);
-}
-body.game-tab-active .mode-tab {
+  /* Previously scoped to body.game-tab-active only, so Profile/Badges/
+     Leaderboard fell back to the bigger default button size — applied
+     unconditionally now so all 5 tabs stay the same compact size. */
   padding: clamp(3px, 0.7vh, 6px) clamp(5px, 1.2vw, 10px);
   font-size: clamp(9px, 1.4vh, 11px);
 }

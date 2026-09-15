@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../supabase/useAuth';
 import { getProfileStats, type ProfileStats } from '../supabase/api';
 import type { WheelMode } from '../supabase/types';
+import { isDarkMode, setDarkMode } from '../theme';
 import { SignIn } from './SignIn';
 
 function formatTime(totalSeconds: number): string {
@@ -43,6 +44,12 @@ export function Profile() {
   const [error, setError] = useState<string | null>(null);
   const [wheelModeSaving, setWheelModeSaving] = useState(false);
   const [wheelModeError, setWheelModeError] = useState<string | null>(null);
+  const [darkMode, setDarkModeState] = useState(isDarkMode());
+
+  function handleThemeChange(dark: boolean) {
+    setDarkModeState(dark);
+    setDarkMode(dark);
+  }
 
   useEffect(() => {
     if (!session) return;
@@ -159,6 +166,20 @@ export function Profile() {
           </div>
         </div>
         {wheelModeError && <div style={{ color: 'var(--invalid)', fontSize: '12px' }}>{wheelModeError}</div>}
+        <div className="config-row">
+          <div>
+            <div className="config-row-label">Theme</div>
+            <div className="small">Switch between a light or dark screen. Saved on this device only.</div>
+          </div>
+          <div className="config-toggle" role="group" aria-label="Theme">
+            <button type="button" className={darkMode ? undefined : 'active'} onClick={() => handleThemeChange(false)}>
+              Light
+            </button>
+            <button type="button" className={darkMode ? 'active' : undefined} onClick={() => handleThemeChange(true)}>
+              Dark
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="profile-panel">
